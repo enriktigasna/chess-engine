@@ -134,6 +134,21 @@ impl Board {
         }
 
         // Remove castling permission if rook is moved or captured
+        match _move.to() {
+            63 => self.game_state.disable_castle(Sides::WHITE, false),
+            56 => self.game_state.disable_castle(Sides::WHITE, true),
+            7 => self.game_state.disable_castle(Sides::BLACK, false),
+            0 => self.game_state.disable_castle(Sides::BLACK, true),
+            _ => ()
+        }
+        
+        match _move.from() {
+            63 => self.game_state.disable_castle(Sides::WHITE, false),
+            56 => self.game_state.disable_castle(Sides::WHITE, true),
+            7 => self.game_state.disable_castle(Sides::BLACK, false),
+            0 => self.game_state.disable_castle(Sides::BLACK, true),
+            _ => ()
+        }
 
         self.game_state.active_color = self.them();
     }
@@ -188,12 +203,7 @@ impl Board {
             self.add_piece(rook_from, Pieces::ROOK, self.us());
         }
 
-        // weird
-        if _move.is_promotion() {
-            self.add_piece(_move.from(), Pieces::PAWN, self.us());
-        } else {
-            self.add_piece(_move.from(), _move.piece(), self.us());
-        }
+        self.add_piece(_move.from(), _move.piece(), self.us());
     }
 
     pub fn add_piece(&mut self, square: Square, piece: Piece, side: Side) {

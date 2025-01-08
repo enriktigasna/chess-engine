@@ -105,7 +105,6 @@ impl Move {
         }
 
         Move(data)
-
     }
 
     pub fn is_castle(&self) -> bool {
@@ -117,7 +116,7 @@ impl Move {
     }
     
     pub fn promotion_piece(&self) -> Piece {
-        self.0 >> Shift::PROMOTION_PIECE + 1
+        (self.0 >> Shift::PROMOTION_PIECE) + 1
     }
 
     pub fn from(&self) -> Square {

@@ -1,4 +1,4 @@
-use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{defs::Move, movegen::{bitscan_forward, MoveGen}}};
+use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{defs::Move, movegen::MoveGen}};
 
 use macroquad::{color::{Color, WHITE}, file::set_pc_assets_folder, input::{is_mouse_button_down, mouse_position, MouseButton}, math::vec2, shapes::{draw_circle, draw_rectangle}, texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D}, window::{next_frame, screen_height, screen_width, Conf}};
 
@@ -194,8 +194,16 @@ async fn main() {
                 if move_hints.contains(&target) {
                     for _move in moves.clone() {
                         if _move.from() == active_square.expect("Corrupted board state") && _move.to() == target {
+                            // Force promote to queen
+                            if _move.is_promotion() && _move.promotion_piece() != Pieces::QUEEN {
+                                continue;
+                            }
+
+                            
                             board.do_move(&_move);
                             moves = mg.gen_legal_moves(&mut board);
+
+                            break;
                         }
                     }
                 }

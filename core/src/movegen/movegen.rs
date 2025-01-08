@@ -4,7 +4,7 @@ use std::vec;
 // Low hanging fruit:
 // replace bitscan_forward with squares_in iterator
 
-use crate::board::{board::Board, defs::{Bitboard, Piece, Pieces, Side, Sides}};
+use crate::board::{board::Board, defs::{Bitboard, Pieces, Side, Sides}};
 
 use super::defs::{LeapingMagics, Move};
 
@@ -73,14 +73,7 @@ impl MoveGen {
                 }
                 
                 if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_enpassant(target) {
-                if target_rank == promotion_rank {
-                    moves.push(Move::new_promotion(square, target, board, Pieces::QUEEN));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::ROOK));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::BISHOP));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::KNIGHT));
-                } else {
-                    moves.push(Move::new(square, target, board));
-                }
+                    moves.push(Move::new_enpassant(square, target, board));
                 }
 
             }
@@ -93,7 +86,6 @@ impl MoveGen {
     pub fn gen_pawn_attacks(&self, board: &Board) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
         let us = board.us();
-        let them = board.them();
 
         let our_pawns = board.get_pieces(us, Pieces::PAWN);
 
@@ -338,14 +330,7 @@ impl MoveGen {
     
     pub fn in_check(&self, board: &mut Board, side: Side) -> bool {
         let king = board.get_pieces(side, Pieces::KING);
-
-        let checked = if king & self.gen_attack_bitboard(board, side ^ 1) == 0 {
-            false
-        } else {
-            true
-        };
-
-        checked
+        king & self.gen_attack_bitboard(board, side ^ 1) != 0
     }
 
     pub fn gen_moves(&self, board: &mut Board) -> Vec<Move> {

@@ -1,4 +1,4 @@
-use crate::movegen::defs::Move;
+use crate::movegen::moves::Move;
 
 use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, BB_SQUARES, EMPTY};
 
@@ -101,7 +101,7 @@ impl Board {
             let long_castle: bool = match _move.to() as isize - _move.from() as isize {
                 -2 => true,
                 2 => false,
-                _ => panic!("Invalid castle"),
+                _ => panic!("Invalid castle, {:?}", _move),
             };
 
             let rook_remove_offset = if long_castle {-2} else {1};
@@ -117,7 +117,7 @@ impl Board {
         };
 
         self.game_state.enpassant_piece = None;
-        if _move.is_double_hop() {
+        if _move.is_double_hop() && _move.piece() == Pieces::PAWN {
             match self.us() {
                 Sides::WHITE => self.game_state.enpassant_piece = Some(_move.to() + 8),
                 Sides::BLACK => self.game_state.enpassant_piece = Some(_move.to() - 8),
@@ -148,6 +148,12 @@ impl Board {
             7 => self.game_state.disable_castle(Sides::BLACK, false),
             0 => self.game_state.disable_castle(Sides::BLACK, true),
             _ => ()
+        }
+
+        // Remove castling if move is king
+        if _move.piece() == Pieces::KING {
+            self.game_state.disable_castle(self.us(), true);
+            self.game_state.disable_castle(self.us(), false);
         }
 
         self.game_state.active_color = self.them();
@@ -268,15 +274,20 @@ impl Board {
     pub fn from_fen(fen_string: &str) -> Result<Board, InvalidFenError> {
         let mut bb_pieces = [[EMPTY; NrOf::PIECE_TYPES]; 2];
         let parts: Vec<&str> = fen_string.split(' ').collect();
+        
+        if parts.len() < 4 {
+            return Err(InvalidFenError::InvalidPartCount)
+        }
 
         let ranks: Vec<&str> = parts[0].split('/').collect();
         if ranks.len() != 8 {
             return Err(InvalidFenError::InvalidRankCount)
         }
 
+
         let active_color = match parts[1] {
             "w" => Sides::WHITE,
-            "b" => Sides::WHITE,
+            "b" => Sides::BLACK,
             _ => return Err(InvalidFenError::InvalidActiveColor)
         };
 

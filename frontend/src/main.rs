@@ -1,4 +1,4 @@
-use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{defs::Move, movegen::MoveGen}};
+use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{moves::Move, movegen::MoveGen}};
 
 use macroquad::{color::{Color, WHITE}, file::set_pc_assets_folder, input::{is_mouse_button_down, mouse_position, MouseButton}, math::vec2, shapes::{draw_circle, draw_rectangle}, texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D}, window::{next_frame, screen_height, screen_width, Conf}};
 
@@ -76,6 +76,9 @@ async fn main() {
 
     let mg = MoveGen;
     let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
+    //let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid FEN");
+    //let mut board = Board::from_fen("8/8/1Kpp4/1P5r/1R3p1k/4P3/6P1/8 b - - 1 2").unwrap();
+
     let mut moves = mg.gen_legal_moves(&mut board);
     let mut move_hints: Vec<Square> = vec![];
     let mut active_square: Option<Square> = None;
@@ -179,6 +182,18 @@ async fn main() {
             );
         }
 
+        // EN PASSANT
+        if let Some(square) = board.game_state.enpassant_piece {
+            let x = square_size * (square % 8) as f32;
+            let y = square_size * (square / 8) as f32;
+
+            draw_circle(
+                x + 0.5*square_size,
+                y + 0.5*square_size,
+                square_size / 5.0,
+                Color::from_rgba(255, 0, 0, (255.0*0.14) as u8)
+            );
+        }
 
         // TODO: Add mouse right deselect
         if is_mouse_button_down(MouseButton::Left) {

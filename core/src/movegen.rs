@@ -1,2 +1,2 @@
 pub mod movegen;
-pub mod defs;
+pub mod moves;

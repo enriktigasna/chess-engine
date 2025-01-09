@@ -45,6 +45,7 @@ impl NrOf {
 
 #[derive(Debug)]
 pub enum InvalidFenError {
+    InvalidPartCount,
     InvalidRankCount,
     InvalidActiveColor,
     InvalidCastlingPermission

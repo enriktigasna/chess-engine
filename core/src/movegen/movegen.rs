@@ -3,10 +3,11 @@ use std::vec;
 
 // Low hanging fruit:
 // replace bitscan_forward with squares_in iterator
+// PRE_ALLOCATE STACK SLICES INSTEAD OF VEC
 
 use crate::board::{board::Board, defs::{Bitboard, Pieces, Side, Sides}};
 
-use super::defs::{LeapingMagics, Move};
+use super::moves::{LeapingMagics, Move};
 
 pub fn bitscan_forward(bb: u64) -> Option<usize> {
     if bb == 0 {
@@ -20,7 +21,7 @@ pub fn bitscan_forward(bb: u64) -> Option<usize> {
 pub struct MoveGen;
 impl MoveGen {
     pub fn gen_pawn_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
         let them = board.them();
 
@@ -58,18 +59,22 @@ impl MoveGen {
             }
 
             for &offset in attacks {
+                if (square % 8 < 1 && offset == attacks[0]) || (square % 8 > 6 && offset == attacks[1]) {
+                    continue;
+                }
+
                 let target = (square as isize + offset) as usize;
                 let target_rank = target / 8;
 
                 if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_occupied(them, target) {
-                if target_rank == promotion_rank {
-                    moves.push(Move::new_promotion(square, target, board, Pieces::QUEEN));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::ROOK));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::BISHOP));
-                    moves.push(Move::new_promotion(square, target, board, Pieces::KNIGHT));
-                } else {
-                    moves.push(Move::new(square, target, board));
-                }
+                    if target_rank == promotion_rank {
+                        moves.push(Move::new_promotion(square, target, board, Pieces::QUEEN));
+                        moves.push(Move::new_promotion(square, target, board, Pieces::ROOK));
+                        moves.push(Move::new_promotion(square, target, board, Pieces::BISHOP));
+                        moves.push(Move::new_promotion(square, target, board, Pieces::KNIGHT));
+                    } else {
+                        moves.push(Move::new(square, target, board));
+                    }
                 }
                 
                 if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_enpassant(target) {
@@ -84,7 +89,7 @@ impl MoveGen {
 
 
     pub fn gen_pawn_attacks(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
 
         let our_pawns = board.get_pieces(us, Pieces::PAWN);
@@ -100,6 +105,9 @@ impl MoveGen {
         while let Some(square) = bitscan_forward(pawns) {
             pawns &= pawns - 1;
             for &offset in attacks {
+                if (square % 8 < 1 && offset == attacks[0]) || (square % 8 > 6 && offset == attacks[1]) {
+                    continue;
+                }
                 let target = (square as isize + offset) as usize;
 
                 if (square as isize / 8 - target as isize / 8).abs() == 1 {
@@ -117,7 +125,7 @@ impl MoveGen {
     }
 
     pub fn gen_knight_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
 
         let mut our_knights = board.get_pieces(us, Pieces::KNIGHT);
@@ -138,7 +146,7 @@ impl MoveGen {
     }
 
     pub fn gen_rook_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
         let them = board.them();
 
@@ -178,7 +186,7 @@ impl MoveGen {
     }
 
     pub fn gen_bishop_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 4] = &[9, -9, 7, -7];
@@ -218,7 +226,7 @@ impl MoveGen {
     }
 
     pub fn gen_queen_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 8] = &[9, -9, 7, -7, 1, -1, 8, -8];
@@ -260,7 +268,7 @@ impl MoveGen {
     }
 
     pub fn gen_king_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+        let mut moves: Vec<Move> = Vec::with_capacity(8);
         let us = board.us();
 
         let mut our_king = board.get_pieces(us, Pieces::KING);
@@ -280,22 +288,29 @@ impl MoveGen {
         moves
     }
 
-    pub fn gen_castle_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+    pub fn gen_castle_moves(&self, board: &mut Board) -> Vec<Move> {
+        let mut moves: Vec<Move> = Vec::with_capacity(20);
         let us = board.us();
+        let them = board.them();
 
         let our_king = bitscan_forward(board.get_pieces(us, Pieces::KING)).expect("King not found");
+        
+        let attack_bb = self.gen_attack_bitboard(board, them);
 
         // Short castle
         if board.game_state.can_castle(us, false) {
-            if board.get_piece_at(our_king + 1).is_none() && board.get_piece_at(our_king + 2).is_none() {
-                moves.push(Move::new_castle(our_king, our_king + 2, board));
+            if board.get_piece_at(our_king + 1).is_none() && board.get_piece_at(our_king + 2).is_none() && !self.in_check(board, us) {
+                if (1 << our_king & attack_bb) == 0 && (1 << our_king + 1 & attack_bb) == 0 {
+                    moves.push(Move::new_castle(our_king, our_king + 2, board));
+                }
             }
         }
 
         if board.game_state.can_castle(us, true) {
-            if board.get_piece_at(our_king - 1).is_none() && board.get_piece_at(our_king - 2).is_none() && board.get_piece_at(our_king - 3).is_none() {
-                moves.push(Move::new_castle(our_king, our_king - 2, board));
+            if board.get_piece_at(our_king - 1).is_none() && board.get_piece_at(our_king - 2).is_none() && board.get_piece_at(our_king - 3).is_none() && !self.in_check(board, us){
+                if (1 << our_king & attack_bb) == 0 && (1 << our_king - 1 & attack_bb) == 0 {
+                    moves.push(Move::new_castle(our_king, our_king - 2, board));
+                }
             }
         }
 
@@ -308,7 +323,7 @@ impl MoveGen {
 
         let backup = board.game_state.active_color;
         board.game_state.active_color = side;
-        let mut moves = vec![];
+        let mut moves = Vec::with_capacity(218);
         
         moves.append(&mut self.gen_pawn_attacks(board));
         moves.append(&mut self.gen_knight_moves(board));
@@ -316,7 +331,6 @@ impl MoveGen {
         moves.append(&mut self.gen_bishop_moves(board));
         moves.append(&mut self.gen_queen_moves(board));
         moves.append(&mut self.gen_king_moves(board));
-        moves.append(&mut self.gen_castle_moves(board));
 
         for _move in moves {
             bitboard |=  1 << _move.to();

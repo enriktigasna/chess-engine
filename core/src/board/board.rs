@@ -1,6 +1,8 @@
-use crate::movegen::moves::Move;
+use std::collections::{hash_map::Entry, HashMap};
 
-use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, BB_SQUARES, EMPTY};
+use crate::movegen::{movegen::bitscan_forward, moves::Move};
+
+use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, ZobristRandom, BB_SQUARES, EMPTY};
 
 fn algebraic_to_square(alg: &str) -> usize {
     let chars: Vec<char> = alg.chars().collect();
@@ -26,12 +28,97 @@ fn algebraic_to_square(alg: &str) -> usize {
     (rank as usize) * 8 + file as usize
 }
 
-pub struct Board {
-    pub bb_pieces: [[Bitboard; NrOf::PIECE_TYPES]; 2],
-    pub bb_side: [Bitboard; 3],
-    pub game_state: GameState,
-    pub history: History,
-    // pub piece_list: [Piece; NrOf::SQUARES],
+pub struct ZobristRandoms{
+    rnd_pieces: [[[u64; 64]; NrOf::PIECE_TYPES]; 2],
+    rnd_castling: [u64; 4],
+    rnd_side: [u64; 2],
+    rnd_en_passant: [u64; 65]
+}
+impl ZobristRandoms {
+    // musl lcg
+    fn next_random(rand: &mut u64){
+        *rand = rand
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
+    }
+    fn new() -> ZobristRandoms {
+        let mut rnd_pieces = [[[0u64; 64]; NrOf::PIECE_TYPES]; 2];
+        let mut rnd_castling = [0u64; 4];
+        let mut rnd_side = [0u64; 2];
+        let mut rnd_en_passant = [0u64; 65];
+
+        let mut rand = 1;
+
+        // Random pieces
+        for side in 0..2 {
+            for piece in 0..NrOf::PIECE_TYPES {
+                for square in 0..64 {
+                    Self::next_random(&mut rand);
+                    rnd_pieces[side][piece][square] = rand;
+                }
+            }
+        }
+
+        for i in 0..4 {
+            Self::next_random(&mut rand);
+            rnd_castling[i] = rand;
+        }
+
+        for i in 0..2 {
+            Self::next_random(&mut rand);
+            rnd_side[i] = rand;
+        }
+
+        for i in 0..65 {
+            Self::next_random(&mut rand);
+            rnd_en_passant[i] = rand;
+        }
+
+
+        ZobristRandoms {
+            rnd_pieces,
+            rnd_castling,
+            rnd_side,
+            rnd_en_passant
+        }
+    }
+}
+
+pub struct History {
+    stack: Vec<GameState>,
+    counts: HashMap<ZobristHash, usize>,
+}
+impl History {
+    pub fn new() -> History {
+        History { stack: vec![], counts: HashMap::with_capacity(2048) }
+    }
+    pub fn add_entry(&mut self, game_state: &GameState) {
+        self.stack.push(game_state.clone());
+    }
+
+    pub fn pop_entry(&mut self) -> GameState{
+        self.stack.pop().expect("Don't pop an empty history!")
+    }
+
+    pub fn increment_hash(&mut self, hash: u64) {
+        *self.counts.entry(hash).or_insert(0) += 1;
+    }
+    
+    pub fn decrement_hash(&mut self, hash: u64) {
+        match self.counts.entry(hash) {
+            Entry::Occupied(mut entry) => {
+                *entry.get_mut() -= 1;
+                if *entry.get() == 0 {
+                    entry.remove();
+                }
+            }
+            Entry::Vacant(_) => {}
+        }
+    }
+
+    pub fn count_hash(&self, hash: u64) -> usize {
+        *self.counts.get(&hash).unwrap_or(&0)
+    }
 }
 
 #[derive(Clone)]
@@ -68,20 +155,14 @@ impl GameState {
     }
 }
 
-pub struct History {
-    stack: Vec<GameState>
-}
-impl History {
-    pub fn new() -> History {
-        History { stack: vec![] }
-    }
-    pub fn add_entry(&mut self, game_state: &GameState) {
-        self.stack.push(game_state.clone());
-    }
 
-    pub fn pop_entry(&mut self) -> GameState{
-        self.stack.pop().expect("Don't pop an empty history!")
-    }
+pub struct Board {
+    pub bb_pieces: [[Bitboard; NrOf::PIECE_TYPES]; 2],
+    pub bb_side: [Bitboard; 3],
+    pub game_state: GameState,
+    pub history: History,
+    zobrist_randoms: ZobristRandoms
+    // pub piece_list: [Piece; NrOf::SQUARES],
 }
 
 impl Board {
@@ -157,6 +238,34 @@ impl Board {
         }
 
         self.game_state.active_color = self.them();
+        self.history.increment_hash(self.zobrist_hash());
+    }
+
+    pub fn zobrist_hash(&self) -> ZobristHash {
+        let mut zobrist_hash: ZobristHash = 0;
+        for side in 0..2 {
+            for piece in 0..NrOf::PIECE_TYPES {
+                let mut current = self.bb_pieces[side][piece];
+                while let Some(square) = bitscan_forward(current) {
+                    current &= current - 1;
+                    zobrist_hash ^= self.zobrist_randoms.rnd_pieces[side][piece][square];
+                }
+            }
+        }
+
+        zobrist_hash ^= self.zobrist_randoms.rnd_side[self.game_state.active_color];
+        match self.game_state.enpassant_piece {
+            Some(square) => zobrist_hash ^= self.zobrist_randoms.rnd_en_passant[square],
+            None => zobrist_hash ^= self.zobrist_randoms.rnd_en_passant[64],
+        }
+
+        let mut castling = self.game_state.castling_permissions as u64;
+        while let Some(bit) = bitscan_forward(castling) {
+            castling &= castling - 1;
+            zobrist_hash ^= self.zobrist_randoms.rnd_castling[bit]
+        }
+
+        zobrist_hash
     }
 
     pub fn undo_move(&mut self, _move: &Move) {
@@ -210,6 +319,9 @@ impl Board {
         }
 
         self.add_piece(_move.from(), _move.piece(), self.us());
+        
+        
+        self.history.decrement_hash(self.zobrist_hash());
     }
 
     pub fn add_piece(&mut self, square: Square, piece: Piece, side: Side) {
@@ -354,7 +466,9 @@ impl Board {
         };
 
         let history = History::new(); // Empty history, FEN doesn't give history information
+
+        let zobrist_randoms = ZobristRandoms::new();
     
-        Ok(Board { bb_pieces, bb_side, game_state, history })
+        Ok(Board { bb_pieces, bb_side, game_state, history, zobrist_randoms })
     }
 }

@@ -216,7 +216,7 @@ async fn main() {
 
                             
                             board.do_move(&_move);
-                            moves = mg.gen_legal_moves(&mut board);
+                            moves = mg.gen_legal_moves_no_rep(&mut board);
 
                             break;
                         }

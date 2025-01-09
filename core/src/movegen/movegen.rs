@@ -359,6 +359,25 @@ impl MoveGen {
 
         moves
     }
+    
+    pub fn gen_legal_moves_no_rep(&self, board: &mut Board) -> Vec<Move> {
+        let mut moves: Vec<Move> = vec![];
+        
+        let count = board.history.count_hash(board.zobrist_hash());
+        if count >= 3 {
+            return moves;
+        }
+
+        moves.append(&mut self.gen_pawn_moves(board));
+        moves.append(&mut self.gen_knight_moves(board));
+        moves.append(&mut self.gen_rook_moves(board));
+        moves.append(&mut self.gen_bishop_moves(board));
+        moves.append(&mut self.gen_queen_moves(board));
+        moves.append(&mut self.gen_king_moves(board));
+        moves.append(&mut self.gen_castle_moves(board));
+
+        moves
+    }
 
     pub fn gen_legal_moves(&self, board: &mut Board) -> Vec<Move> {
         let mut pseudo_legal = self.gen_moves(board);

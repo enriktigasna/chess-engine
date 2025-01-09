@@ -1,4 +1,6 @@
 pub type Bitboard = u64;
+pub type ZobristRandom = u64;
+pub type ZobristHash = u64;
 pub type Piece = usize;
 pub type Side = usize;
 pub type Square = usize;

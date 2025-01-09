@@ -1,4 +1,4 @@
-use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{moves::Move, movegen::MoveGen}};
+use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{movegen::MoveGen, moves::Move}, search::search::Search};
 
 use macroquad::{color::{Color, WHITE}, file::set_pc_assets_folder, input::{is_mouse_button_down, mouse_position, MouseButton}, math::vec2, shapes::{draw_circle, draw_rectangle}, texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D}, window::{next_frame, screen_height, screen_width, Conf}};
 
@@ -76,6 +76,7 @@ async fn main() {
 
     let mg = MoveGen;
     let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
+    let search = Search;
     //let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid FEN");
     //let mut board = Board::from_fen("8/8/1Kpp4/1P5r/1R3p1k/4P3/6P1/8 b - - 1 2").unwrap();
 
@@ -216,6 +217,11 @@ async fn main() {
 
                             
                             board.do_move(&_move);
+
+                            if let Some(best_move) = search.find_best_move(&mut board, &mg, 3) {
+                                board.do_move(&best_move);
+                            }
+                            
                             moves = mg.gen_legal_moves_no_rep(&mut board);
 
                             break;

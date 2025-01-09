@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::movegen::{movegen::bitscan_forward, moves::Move};
@@ -112,7 +113,7 @@ impl History {
                     entry.remove();
                 }
             }
-            Entry::Vacant(_) => {}
+            Entry::Vacant(_) => panic!("Trying to undo a move that was never done?")
         }
     }
 
@@ -269,6 +270,8 @@ impl Board {
     }
 
     pub fn undo_move(&mut self, _move: &Move) {
+        self.history.decrement_hash(self.zobrist_hash());
+
         self.game_state = self.history.pop_entry();
 
         self.remove_piece(_move.to());
@@ -319,9 +322,6 @@ impl Board {
         }
 
         self.add_piece(_move.from(), _move.piece(), self.us());
-        
-        
-        self.history.decrement_hash(self.zobrist_hash());
     }
 
     pub fn add_piece(&mut self, square: Square, piece: Piece, side: Side) {

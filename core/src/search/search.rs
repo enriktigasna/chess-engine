@@ -74,7 +74,12 @@ impl Search {
             board.do_move(&_move);
             match us {
                 Sides::WHITE => {
-                    let eval = self.search_max(board, f32::MIN, f32::MAX, mg, depth-1);
+                    let eval = self.search_max(board, f32::MIN, f32::MAX, mg, depth-1, duration, start_time);
+                    if start_time.elapsed() > duration {
+                        board.undo_move(&_move);
+                        break;
+                    }
+
                     if eval > max {
                         max = eval;
                         final_eval = max;
@@ -84,7 +89,12 @@ impl Search {
                     }
                 }
                 Sides::BLACK => {
-                    let eval = self.search_min(board, f32::MIN, f32::MAX, mg, depth-1);
+                    let eval = self.search_min(board, f32::MIN, f32::MAX, mg, depth-1,duration, start_time);
+                    if start_time.elapsed() > duration {
+                        board.undo_move(&_move);
+                        break;
+                    }
+
                     if eval < min {
                         min = eval;
                         final_eval = min;
@@ -97,6 +107,11 @@ impl Search {
             }
 
             board.undo_move(&_move);
+
+            if start_time.elapsed() > duration {
+                return None;
+            }
+            
             self.transposition_table.insert(TranspositionEntry {
                 key: hash,
                 best_move: best_move.clone(),
@@ -110,12 +125,24 @@ impl Search {
         return Some(best_move.clone());
     }
 
-    pub fn search_max(&self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize) -> f32 {
-        if depth == 0 {
-            return self.static_eval(board, mg);
+    pub fn put_move_first(&self, moves: &mut Vec<Move>, _move: &Move) {
+        let index = moves.iter()
+            .enumerate()
+            .find(|&r| r.1.0 == _move.0)
+            .unwrap()
+            .0;
+
+        moves.swap(0, index);
+    }
+
+    pub fn search_max(&mut self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize, duration: Duration, start_time: Instant) -> f32 {
+        if start_time.elapsed() > duration {
+            return 0.0;
         }
 
-        let mut max_value = f32::MIN;
+        if depth == 0 {
+            return self.quiescence_max(board, alpha, beta, mg, 10);
+        }
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
 
@@ -134,17 +161,162 @@ impl Search {
         let existing_entry = self.transposition_table.get(hash);
 
         if let Some(entry) = existing_entry {
-            let index = moves.iter()
-                .enumerate()
-                .find(|&r| r.1.0 == entry.best_move.0)
-                .unwrap()
-                .0;
-            moves.swap(0, index);
+            if entry.depth >= depth && entry.move_type == MoveType::Alpha {
+                return entry.eval
+            }
+            
+            self.put_move_first(&mut moves, &entry.best_move);
+        }
+
+        let mut max_value = f32::MIN;
+        let mut best_move= moves[0].clone();
+        for _move in moves {
+            board.do_move(&_move);
+            let score = self.search_min(board, alpha, beta, mg, depth-1, duration, start_time);
+            board.undo_move(&_move);
+            
+            if start_time.elapsed() > duration {
+                return 0.0;
+            }
+
+            if score > max_value {
+                max_value = score;
+                best_move = _move;
+            }
+
+            if score > alpha {
+                alpha = score;
+            }
+
+            if alpha >= beta {
+                break;
+            }
+        }
+
+        self.transposition_table.insert(TranspositionEntry {
+            key: hash,
+            best_move: best_move.clone(),
+            move_type: MoveType::Alpha,
+            eval: max_value,
+            depth,
+            age: self.transposition_table.age
+        });
+
+        max_value
+    }
+    
+    pub fn search_min(&mut self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize, duration: Duration, start_time: Instant) -> f32 {
+        if start_time.elapsed() > duration {
+            return 0.0;
+        }
+
+        if depth == 0 {
+            return self.quiescence_min(board, alpha, beta, mg, 10);
+        }
+
+        let mut moves = mg.gen_legal_moves_no_rep(board);
+        let hash = board.zobrist_hash();
+
+        if let Some(entry) = self.transposition_table.get(hash) {
+            if entry.depth >= depth && entry.move_type == MoveType::Beta {
+                return entry.eval
+            }
+            
+            self.put_move_first(&mut moves, &entry.best_move);
+        }
+
+        if moves.len() == 0 {
+            if mg.in_check(board, Sides::WHITE) {
+                return f32::MAX
+            }
+            if mg.in_check(board, Sides::BLACK) {
+                return f32::MIN
+            }
+            return 0.0
+        }
+
+        let mut min_value = f32::MAX;
+        let mut best_move= moves[0].clone();
+        for _move in moves {
+            board.do_move(&_move);
+            let score = self.search_max(board, alpha, beta, mg, depth-1, duration, start_time);
+            board.undo_move(&_move);
+
+            if start_time.elapsed() > duration {
+                return 0.0;
+            }
+
+            if score < min_value {
+                min_value = score;
+                best_move = _move;
+            }
+
+            if score < beta {
+                beta = score;
+            }
+
+            if alpha >= beta {
+                break;
+            }
+        }
+
+        self.transposition_table.insert(TranspositionEntry {
+            key: hash,
+            best_move: best_move.clone(),
+            move_type: MoveType::Beta,
+            eval: min_value,
+            depth,
+            age: self.transposition_table.age
+        });
+        min_value
+    }
+    
+    pub fn quiescence_max(&mut self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize) -> f32 {
+        if depth == 0 {
+            return self.static_eval(board, mg);
+        }
+        
+        let stand_pat = self.static_eval(board, mg);
+        
+        if stand_pat >= beta { return beta; }
+        if stand_pat > alpha { alpha = stand_pat; }
+
+
+        let mut moves = mg.gen_legal_moves_no_rep(board);
+
+        if moves.len() == 0 {
+            if mg.in_check(board, Sides::WHITE) {
+                return f32::MIN
+            }
+            if mg.in_check(board, Sides::BLACK) {
+                return f32::MAX
+            }
+
+            return 0.0
+        }
+
+        let hash = board.zobrist_hash();
+        let existing_entry = self.transposition_table.get(hash);
+
+        if let Some(entry) = existing_entry {
+            if entry.depth >= depth && entry.move_type == MoveType::Alpha {
+                return entry.eval
+            }
+
+            self.put_move_first(&mut moves, &entry.best_move);
+        }
+
+
+        let mut max_value = f32::MIN;
+        
+        let moves: Vec<&Move> = moves.iter().filter(|m| m.capture().is_some()).collect();
+        if moves.len() == 0 {
+            return self.static_eval(board, mg);
         }
 
         for _move in moves {
             board.do_move(&_move);
-            let score = self.search_min(board, alpha, beta, mg, depth-1);
+            let score = self.quiescence_min(board, alpha, beta, mg, depth-1);
             board.undo_move(&_move);
 
             if score > max_value {
@@ -163,10 +335,15 @@ impl Search {
         max_value
     }
     
-    pub fn search_min(&self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize) -> f32 {
+    pub fn quiescence_min(&mut self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize) -> f32 {
         if depth == 0 {
             return self.static_eval(board, mg);
         }
+        
+        let stand_pat = self.static_eval(board, mg);
+        
+        if stand_pat >= beta { return beta; }
+        if stand_pat > alpha { alpha = stand_pat; }
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
         let hash = board.zobrist_hash();
@@ -176,12 +353,7 @@ impl Search {
                 return entry.eval
             }
             
-            let index = moves.iter()
-                .enumerate()
-                .find(|&r| r.1.0 == entry.best_move.0)
-                .unwrap()
-                .0;
-            moves.swap(0, index);
+            self.put_move_first(&mut moves, &entry.best_move);
         }
 
         if moves.len() == 0 {
@@ -193,11 +365,16 @@ impl Search {
             }
             return 0.0
         }
+        
+        let moves: Vec<&Move> = moves.iter().filter(|m| m.capture().is_some()).collect();
+        if moves.len() == 0 {
+            return self.static_eval(board, mg);
+        }
 
         let mut min_value = f32::MAX;
         for _move in moves {
             board.do_move(&_move);
-            let score = self.search_max(board, alpha, beta, mg, depth-1);
+            let score = self.quiescence_max(board, alpha, beta, mg, depth-1);
             board.undo_move(&_move);
 
             if score < min_value {
@@ -219,15 +396,15 @@ impl Search {
     pub fn static_eval(&self, board: &mut Board, mg: &MoveGen) -> f32 {
         // add all white pieces
         let mut eval: f32 = 0.0;
-        let pieces = [1.0, 3.0, 3.2, 5.0, 9.0, 0.0];
 
-        let psqt_set = self.get_psqt_set(board);
+        let psqt_set = self.get_psqt_set();
         eval += self.apply_psqt(board, psqt_set);
 
         eval
     }
     
-    pub fn get_psqt_set(&self, board: &Board) -> [[i32; 64]; 6] {
+    #[inline]
+    pub const fn get_psqt_set(&self) -> [[i32; 64]; 6] {
         [PieceTables::PAWN, PieceTables::BISHOP, PieceTables::KNIGHT, PieceTables::ROOK, PieceTables::QUEEN, PieceTables::EARLY_KING]
     }
 

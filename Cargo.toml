@@ -3,5 +3,6 @@
 members = [
     "frontend",
     "core",
-    "benchmarker"
+    "benchmarker",
+    "uci"
 ]

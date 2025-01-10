@@ -383,10 +383,19 @@ impl MoveGen {
         let points = [1, 3, 3, 5, 8, 0];
         
         pseudo_legal.sort_by(|a, b| {
-            let points1 = (points[a.capture().unwrap_or(5)])*10 as isize - points[a.piece()] as isize;
-            let points2 = (points[b.capture().unwrap_or(5)])*10 as isize - points[b.piece()] as isize;
+            let score_a = a.capture()
+                .map(|cap| {
+                    points[cap] * 10 - points[a.piece()]
+                })
+                .unwrap_or(0);
 
-            points2.partial_cmp(&points1).unwrap_or(std::cmp::Ordering::Equal)
+            let score_b = b.capture()
+                .map(|cap| {
+                    points[cap] * 10 - points[b.piece()]
+                })
+                .unwrap_or(0);
+
+            score_b.cmp(&score_a)
         });
 
         pseudo_legal

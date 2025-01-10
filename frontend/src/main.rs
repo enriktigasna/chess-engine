@@ -218,7 +218,7 @@ async fn main() {
                             
                             board.do_move(&_move);
 
-                            if let Some(best_move) = search.find_best_move(&mut board, &mg, 3) {
+                            if let Some(best_move) = search.find_best_move(&mut board, &mg, 4) {
                                 board.do_move(&best_move);
                             }
                             

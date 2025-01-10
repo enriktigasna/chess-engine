@@ -368,7 +368,7 @@ impl MoveGen {
 
         self.gen_legal_moves(board)
     }
-
+    
     pub fn gen_legal_moves(&self, board: &mut Board) -> Vec<Move> {
         let mut pseudo_legal = self.gen_moves(board);
         let us = board.us();
@@ -378,6 +378,15 @@ impl MoveGen {
             let king_in_check = self.in_check(board, us);
             board.undo_move(_move);
             !king_in_check
+        });
+
+        let points = [1, 3, 3, 5, 8, 0];
+        
+        pseudo_legal.sort_by(|a, b| {
+            let points1 = (points[a.capture().unwrap_or(5)])*10 as isize - points[a.piece()] as isize;
+            let points2 = (points[b.capture().unwrap_or(5)])*10 as isize - points[b.piece()] as isize;
+
+            points2.partial_cmp(&points1).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         pseudo_legal

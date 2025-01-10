@@ -1,9 +1,8 @@
-use core::panic;
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::movegen::{movegen::bitscan_forward, moves::Move};
 
-use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, ZobristRandom, BB_SQUARES, EMPTY};
+use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES, EMPTY};
 
 fn algebraic_to_square(alg: &str) -> usize {
     let chars: Vec<char> = alg.chars().collect();
@@ -162,8 +161,8 @@ pub struct Board {
     pub bb_side: [Bitboard; 3],
     pub game_state: GameState,
     pub history: History,
+    pub piece_list: [Option<Piece>; NrOf::SQUARES],
     zobrist_randoms: ZobristRandoms
-    // pub piece_list: [Piece; NrOf::SQUARES],
 }
 
 impl Board {
@@ -328,6 +327,7 @@ impl Board {
         self.bb_pieces[side][piece] |= 1 << square;
         self.bb_side[side] |= 1 << square;
         self.bb_side[Sides::BOTH] |= 1 << square;
+        self.piece_list[square] = Some(piece);
     }
 
     pub fn remove_piece(&mut self, square: Square) {
@@ -340,6 +340,7 @@ impl Board {
         for side in 0..3 {
             self.bb_side[side] = self.bb_side[side] & !(1 << square);
         }
+        self.piece_list[square] = None;
     }
 
     pub fn get_pieces(&self, side: Side, piece: Piece) -> Bitboard {
@@ -351,16 +352,7 @@ impl Board {
     }
 
     pub fn get_piece_at(&self, square: Square) -> Option<Piece> {
-        for piece in 0..NrOf::PIECE_TYPES {
-            if self.bb_pieces[Sides::WHITE][piece] >> square & 1 == 1 {
-                return Some(piece);
-            }
-
-            if self.bb_pieces[Sides::BLACK][piece] >> square & 1 == 1 {
-                return Some(piece);
-            }
-        }
-        None
+        self.piece_list[square]
     }
 
     pub fn us(&self) -> Side {
@@ -433,6 +425,17 @@ impl Board {
             }
         }
 
+        let mut piece_list: [Option<Piece>; 64] = [None; 64];
+        for side in 0..2 {
+            for piece in 0..6 {
+                let mut current = bb_pieces[side][piece];
+                while let Some(square) = bitscan_forward(current) {
+                    current &= current - 1;
+                    piece_list[square] = Some(piece);
+                }
+            }
+        }
+
         // Fold all white and black pieces with bitwise AND
         // This will be the aggregate bitboard for white and black pieces
         let bb_side: [Bitboard; 3] = [
@@ -469,6 +472,6 @@ impl Board {
 
         let zobrist_randoms = ZobristRandoms::new();
     
-        Ok(Board { bb_pieces, bb_side, game_state, history, zobrist_randoms })
+        Ok(Board { bb_pieces, bb_side, game_state, history, zobrist_randoms, piece_list })
     }
 }

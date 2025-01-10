@@ -1,4 +1,4 @@
-use std::{time::Duration, usize};
+use std::{time::{Duration, Instant}, usize};
 
 use crate::{board::{board::Board, defs::{Piece, Sides}}, movegen::{movegen::{bitscan_forward, MoveGen}, moves::Move}};
 
@@ -17,7 +17,30 @@ pub const FLIP: [usize; 64] = [
 
 pub struct Search;
 impl Search {
-    pub fn find_best_move(&self, board: &mut Board, mg: &MoveGen, depth: usize) -> Option<Move> {
+    pub fn find_best_move_iter(&self, board: &mut Board, mg: &MoveGen, max_depth: usize, duration: Duration) -> Option<Move> {
+        let mut moves = mg.gen_legal_moves_no_rep(board);
+        if moves.len() == 0 {
+            return None
+        }
+
+        let mut best_move = moves[0].clone();
+        let start_time = Instant::now();
+
+        for depth in 1..max_depth {
+            let current_best = self.find_best_move(board, mg, depth, start_time, duration);
+
+            if start_time.elapsed() > duration {
+                break;
+            }
+
+            // We already established it's not empty
+            best_move = current_best.unwrap();
+        }
+
+        Some(best_move)
+    }
+
+    pub fn find_best_move(&self, board: &mut Board, mg: &MoveGen, depth: usize, start_time: Instant, duration: Duration) -> Option<Move> {
         let moves = mg.gen_legal_moves_no_rep(board);
 
         if moves.len() == 0 {
@@ -30,15 +53,18 @@ impl Search {
         let us = board.us();
 
         for _move in moves {
-            board.do_move(&_move);
+            if start_time.elapsed() > duration {
+                break;
+            }
 
+            board.do_move(&_move);
             match us {
                 Sides::WHITE => {
                     let eval = self.search_max(board, f32::MIN, f32::MAX, mg, depth-1);
                     if eval > max {
                         max = eval;
                         best_move = _move.clone();
-                        println!("Eval {max}");
+                        println!("Eval {max} Depth {depth}");
                     }
                 }
                 Sides::BLACK => {
@@ -46,7 +72,7 @@ impl Search {
                     if eval < min {
                         min = eval;
                         best_move = _move.clone();
-                        println!("Eval {min}");
+                        println!("Eval {min} Depth {depth}");
                     }
                 }
                 _ => panic!("Invalid game state")
@@ -57,7 +83,6 @@ impl Search {
         return Some(best_move.clone());
     }
 
-    
     pub fn search_max(&self, board: &mut Board, mut alpha: f32, mut beta: f32, mg: &MoveGen, depth: usize) -> f32 {
         if depth == 0 {
             return self.static_eval(board, mg);

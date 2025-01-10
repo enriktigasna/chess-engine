@@ -1,8 +1,8 @@
 use std::{time::{Duration, Instant}, usize};
 
-use crate::{board::{board::Board, defs::{Piece, Sides}}, movegen::{movegen::{bitscan_forward, MoveGen}, moves::Move}};
+use crate::{board::{board::Board, defs::Sides}, movegen::{movegen::{bitscan_forward, MoveGen}, moves::Move}};
 
-use super::defs::PieceTables;
+use super::{defs::PieceTables, ttable::{MoveType, TranspositionEntry, TranspositionTable}};
 
 pub const FLIP: [usize; 64] = [
     56, 57, 58, 59, 60, 61, 62, 63,
@@ -15,9 +15,11 @@ pub const FLIP: [usize; 64] = [
      0,  1,  2,  3,  4,  5,  6,  7,
 ];
 
-pub struct Search;
+pub struct Search {
+    pub transposition_table: TranspositionTable
+}
 impl Search {
-    pub fn find_best_move_iter(&self, board: &mut Board, mg: &MoveGen, max_depth: usize, duration: Duration) -> Option<Move> {
+    pub fn find_best_move_iter(&mut self, board: &mut Board, mg: &MoveGen, max_depth: usize, duration: Duration) -> Option<Move> {
         let mut moves = mg.gen_legal_moves_no_rep(board);
         if moves.len() == 0 {
             return None
@@ -37,10 +39,12 @@ impl Search {
             best_move = current_best.unwrap();
         }
 
+        self.transposition_table.increment_age();
+
         Some(best_move)
     }
 
-    pub fn find_best_move(&self, board: &mut Board, mg: &MoveGen, depth: usize, start_time: Instant, duration: Duration) -> Option<Move> {
+    pub fn find_best_move(&mut self, board: &mut Board, mg: &MoveGen, depth: usize, start_time: Instant, duration: Duration) -> Option<Move> {
         let moves = mg.gen_legal_moves_no_rep(board);
 
         if moves.len() == 0 {
@@ -50,7 +54,17 @@ impl Search {
         let mut max: f32 = f32::MIN;
         let mut min: f32 = f32::MAX;
 
+        let hash = board.zobrist_hash();
+        if let Some(entry) = self.transposition_table.get(hash) {
+            if entry.depth >= depth {
+                return Some(entry.best_move)
+            }
+        }
+
         let us = board.us();
+
+        let mut move_type = MoveType::Alpha;
+        let mut final_eval = 0.0;
 
         for _move in moves {
             if start_time.elapsed() > duration {
@@ -63,21 +77,34 @@ impl Search {
                     let eval = self.search_max(board, f32::MIN, f32::MAX, mg, depth-1);
                     if eval > max {
                         max = eval;
+                        final_eval = max;
                         best_move = _move.clone();
                         println!("Eval {max} Depth {depth}");
+                        move_type = MoveType::Alpha;
                     }
                 }
                 Sides::BLACK => {
                     let eval = self.search_min(board, f32::MIN, f32::MAX, mg, depth-1);
                     if eval < min {
                         min = eval;
+                        final_eval = min;
                         best_move = _move.clone();
                         println!("Eval {min} Depth {depth}");
+                        move_type = MoveType::Beta;
                     }
                 }
                 _ => panic!("Invalid game state")
             }
+
             board.undo_move(&_move);
+            self.transposition_table.insert(TranspositionEntry {
+                key: hash,
+                best_move: best_move.clone(),
+                move_type: move_type.clone(),
+                eval: final_eval,
+                depth,
+                age: self.transposition_table.age
+            });
         }
 
         return Some(best_move.clone());
@@ -90,7 +117,8 @@ impl Search {
 
         let mut max_value = f32::MIN;
 
-        let moves = mg.gen_legal_moves_no_rep(board);
+        let mut moves = mg.gen_legal_moves_no_rep(board);
+
         if moves.len() == 0 {
             if mg.in_check(board, Sides::WHITE) {
                 return f32::MIN
@@ -100,6 +128,18 @@ impl Search {
             }
 
             return 0.0
+        }
+
+        let hash = board.zobrist_hash();
+        let existing_entry = self.transposition_table.get(hash);
+
+        if let Some(entry) = existing_entry {
+            let index = moves.iter()
+                .enumerate()
+                .find(|&r| r.1.0 == entry.best_move.0)
+                .unwrap()
+                .0;
+            moves.swap(0, index);
         }
 
         for _move in moves {
@@ -128,7 +168,22 @@ impl Search {
             return self.static_eval(board, mg);
         }
 
-        let moves = mg.gen_legal_moves_no_rep(board);
+        let mut moves = mg.gen_legal_moves_no_rep(board);
+        let hash = board.zobrist_hash();
+
+        if let Some(entry) = self.transposition_table.get(hash) {
+            if entry.depth >= depth && entry.move_type == MoveType::Beta {
+                return entry.eval
+            }
+            
+            let index = moves.iter()
+                .enumerate()
+                .find(|&r| r.1.0 == entry.best_move.0)
+                .unwrap()
+                .0;
+            moves.swap(0, index);
+        }
+
         if moves.len() == 0 {
             if mg.in_check(board, Sides::WHITE) {
                 return f32::MAX

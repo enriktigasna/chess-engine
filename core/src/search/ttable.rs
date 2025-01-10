@@ -1,37 +1,38 @@
-use std::{collections::HashMap, vec};
+use std::vec;
 
 use crate::{board::defs::ZobristHash, movegen::moves::Move};
 
-#[derive(Clone)]
-enum MoveType {
+#[derive(Clone, PartialEq)]
+pub enum MoveType {
     Alpha,
     Beta
 }
 
 #[derive(Clone)]
+// 37 Byte entry
 pub struct TranspositionEntry {
-    key: ZobristHash,
-    best_move: Move,
-    move_type: MoveType,
-    evaluation: f32,
-    depth: usize,
-    age: usize
+    pub key: ZobristHash,
+    pub best_move: Move,
+    pub move_type: MoveType,
+    pub eval: f32,
+    pub depth: usize,
+    pub age: usize
 }
 
 pub struct TranspositionTable {
     table: Vec<TranspositionEntry>,
     max_size: usize,
-    age: usize
+    pub age: usize
 }
 
 impl TranspositionTable {
-    fn new(max_size: usize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         let table = vec![
             TranspositionEntry {
                 key: 0,
                 best_move: Move(0),
                 move_type: MoveType::Alpha,
-                evaluation: 0.0,
+                eval: 0.0,
                 depth: 0,
                 age: 0
             };
@@ -42,6 +43,37 @@ impl TranspositionTable {
             table, max_size, age: 0
         }
     }
+
+    pub fn get(&self, hash: ZobristHash) -> Option<TranspositionEntry> {
+        let index = self.index(hash);
+        let entry = &self.table[index];
+
+        //println!("{hash}");
+        if entry.key == hash {
+            Some(entry.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn insert(&mut self, entry: TranspositionEntry) {
+        let index = self.index(entry.key);
+        let existing_entry = &self.table[index];
+
+        match existing_entry.key {
+            0 => self.table[index] = entry,
+            _ => {
+                if entry.depth > existing_entry.depth || (entry.depth >= existing_entry.depth && entry.age > existing_entry.age) {
+                    self.table[index] = entry
+                }
+            }
+        };
+    }
+
+    pub fn increment_age(&mut self) {
+        self.age += 1
+    }
+
     fn index(&self, key: ZobristHash) -> usize {
         (key as usize) % self.max_size
     }

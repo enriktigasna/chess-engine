@@ -126,7 +126,7 @@ fn main() {
                 match best_move {
                     Some(mv) => {
                         if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
-                            println!("info score {} depth {}", entry.eval.round(), entry.depth);
+                            println!("info score {} depth {}", entry.eval, entry.depth);
                         }
                         println!(
                             "bestmove {}",
@@ -139,12 +139,12 @@ fn main() {
                 }
 
                 if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
-                    println!("info score {} depth {}", entry.eval.round(), entry.depth);
+                    println!("info score {} depth {}", entry.eval, entry.depth);
                 }
             },
             "info" => {
                 if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
-                    println!("info score {} depth {}", entry.eval.round(), entry.depth);
+                    println!("info score {} depth {}", entry.eval, entry.depth);
                 }
             }
             "quit" => {

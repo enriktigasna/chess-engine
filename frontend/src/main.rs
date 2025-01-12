@@ -1,5 +1,5 @@
 use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{movegen::MoveGen, moves::Move}, search::{search::Search, ttable::TranspositionTable}};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use macroquad::{color::{Color, WHITE}, file::set_pc_assets_folder, input::{is_mouse_button_down, mouse_position, MouseButton}, math::vec2, shapes::{draw_circle, draw_rectangle}, texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D}, window::{next_frame, screen_height, screen_width, Conf}};
 
@@ -219,7 +219,7 @@ async fn main() {
                             
                             board.do_move(&_move);
 
-                            if let Some(best_move) = search.find_best_move_iter(&mut board, &mg, 7, Duration::new(0, 500000000)) {
+                            if let Some(best_move) = search.find_best_move_iter(&mut board, &mg, 7, Duration::new(2, 0)) {
                                 board.do_move(&best_move);
                             }
                             

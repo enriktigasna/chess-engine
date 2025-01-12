@@ -2,19 +2,12 @@ use std::vec;
 
 use crate::{board::defs::ZobristHash, movegen::moves::Move};
 
-#[derive(Clone, PartialEq)]
-pub enum MoveType {
-    Alpha,
-    Beta
-}
-
 #[derive(Clone)]
 // 37 Byte entry
 pub struct TranspositionEntry {
     pub key: ZobristHash,
     pub best_move: Move,
-    pub move_type: MoveType,
-    pub eval: f32,
+    pub eval: i32,
     pub depth: usize,
     pub age: usize
 }
@@ -31,8 +24,7 @@ impl TranspositionTable {
             TranspositionEntry {
                 key: 0,
                 best_move: Move(0),
-                move_type: MoveType::Alpha,
-                eval: 0.0,
+                eval: 0,
                 depth: 0,
                 age: 0
             };

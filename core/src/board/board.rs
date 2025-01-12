@@ -4,7 +4,7 @@ use crate::movegen::{movegen::bitscan_forward, moves::Move};
 
 use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES, EMPTY};
 
-fn algebraic_to_square(alg: &str) -> usize {
+pub fn algebraic_to_square(alg: &str) -> usize {
     let chars: Vec<char> = alg.chars().collect();
     if chars.len() != 2 {
         panic!("Algebraic notation must be exactly 2 characters, e.g. 'a1'. Got: {}", alg);

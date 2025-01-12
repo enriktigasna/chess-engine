@@ -219,7 +219,7 @@ async fn main() {
                             
                             board.do_move(&_move);
 
-                            if let Some(best_move) = search.find_best_move_iter(&mut board, &mg, 7, Duration::new(1, 0)) {
+                            if let Some(best_move) = search.find_best_move_iter(&mut board, &mg, 7, Duration::new(0, 500000000)) {
                                 board.do_move(&best_move);
                             }
                             

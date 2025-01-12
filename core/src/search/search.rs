@@ -20,7 +20,7 @@ pub struct Search {
 }
 impl Search {
     pub fn find_best_move_iter(&mut self, board: &mut Board, mg: &MoveGen, max_depth: usize, duration: Duration) -> Option<Move> {
-        let mut moves = mg.gen_legal_moves_no_rep(board);
+        let moves = mg.gen_legal_moves_no_rep(board);
         if moves.len() == 0 {
             return None
         }
@@ -84,7 +84,6 @@ impl Search {
                         max = eval;
                         final_eval = max;
                         best_move = _move.clone();
-                        println!("Eval {max} Depth {depth}");
                         move_type = MoveType::Alpha;
                     }
                 }
@@ -99,7 +98,6 @@ impl Search {
                         min = eval;
                         final_eval = min;
                         best_move = _move.clone();
-                        println!("Eval {min} Depth {depth}");
                         move_type = MoveType::Beta;
                     }
                 }

@@ -68,14 +68,14 @@ fn main() {
                         }
                         let from_sq = algebraic_to_square(&mv_str[0..2]);
                         let to_sq = algebraic_to_square(&mv_str[2..4]);
-
+                        
                         for mv in moves {
                             if mv.is_promotion() {
                                 // If parts[move_index] is 4, it will promote to queen
-                                if parts[moves_index].len() == 4 {
+                                if mv_str.len() == 4 {
                                     if mv.promotion_piece() != Pieces::QUEEN { continue; }
                                 } else {
-                                    match parts[moves_index].chars().nth(5).unwrap_or('q') {
+                                    match mv_str.chars().nth(4).unwrap_or('q') {
                                         'n' => { 
                                             if mv.promotion_piece() != Pieces::KNIGHT { continue; }
                                         }
@@ -97,22 +97,6 @@ fn main() {
                                 break;
                             }
                         }
-                    }
-                }
-            },
-            "goto" => {
-                let moves = engine.movegen.gen_legal_moves_no_rep(&mut engine.board);
-                let from = algebraic_to_square(&input[5..7]);
-                let to = algebraic_to_square(&input[7..9]);
-
-                for _move in moves {
-                    if _move.from() == from && _move.to() == to {
-                        engine.board.do_move(&_move);
-                        let best_move = engine.search.find_best_move_iter(&mut engine.board, &engine.movegen, 3, Duration::new(2, 0)).unwrap();
-
-                        println!("bestmove {}", move_to_alg(&best_move));
-
-                        break;
                     }
                 }
             },
@@ -142,7 +126,7 @@ fn main() {
                 match best_move {
                     Some(mv) => {
                         if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
-                            println!("info score {} depth {}", entry.eval, entry.depth);
+                            println!("info score {} depth {}", entry.eval.round(), entry.depth);
                         }
                         println!(
                             "bestmove {}",
@@ -155,13 +139,14 @@ fn main() {
                 }
 
                 if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
-                    println!("info score {} depth {}", entry.eval, entry.depth);
+                    println!("info score {} depth {}", entry.eval.round(), entry.depth);
                 }
             },
-            "bestmove" => {
-                let best_move = engine.search.find_best_move_iter(&mut engine.board, &engine.movegen, 8, Duration::new(2, 0)).unwrap();
-                println!("bestmove {}", move_to_alg(&best_move));
-            },
+            "info" => {
+                if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
+                    println!("info score {} depth {}", entry.eval.round(), entry.depth);
+                }
+            }
             "quit" => {
                 break;
             }

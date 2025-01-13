@@ -1,7 +1,22 @@
-use core::{board::{board::Board, defs::{Bitboard, Pieces, Sides, Square, START_POS}}, movegen::{movegen::MoveGen, moves::Move}, search::{search::Search, ttable::TranspositionTable}};
+use core::{
+    board::{
+        board::Board,
+        defs::{Bitboard, Pieces, Sides, Square, START_POS},
+    },
+    movegen::{movegen::MoveGen, moves::Move},
+    search::{search::Search, ttable::TranspositionTable},
+};
 use std::time::{Duration, Instant};
 
-use macroquad::{color::{Color, WHITE}, file::set_pc_assets_folder, input::{is_mouse_button_down, mouse_position, MouseButton}, math::vec2, shapes::{draw_circle, draw_rectangle}, texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D}, window::{next_frame, screen_height, screen_width, Conf}};
+use macroquad::{
+    color::{Color, WHITE},
+    file::set_pc_assets_folder,
+    input::{is_mouse_button_down, mouse_position, MouseButton},
+    math::vec2,
+    shapes::{draw_circle, draw_rectangle},
+    texture::{draw_texture_ex, load_texture, DrawTextureParams, Texture2D},
+    window::{next_frame, screen_height, screen_width, Conf},
+};
 
 pub struct PieceAssets {
     pub wp: Texture2D,
@@ -32,7 +47,7 @@ impl PieceAssets {
             bn: load_texture("assets/bn.png").await.unwrap(),
             br: load_texture("assets/br.png").await.unwrap(),
             bq: load_texture("assets/bq.png").await.unwrap(),
-            bk: load_texture("assets/bk.png").await.unwrap()
+            bk: load_texture("assets/bk.png").await.unwrap(),
         }
     }
 }
@@ -55,7 +70,7 @@ fn draw_bitboard_pieces(bitboard: Bitboard, texture: &Texture2D, square_size: f3
             let y = square_size * (square_index / 8) as f32;
             draw_texture_ex(
                 texture,
-                x, 
+                x,
                 y,
                 WHITE,
                 DrawTextureParams {
@@ -77,7 +92,10 @@ async fn main() {
 
     let mg = MoveGen;
     let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
-    let mut search = Search { transposition_table: TranspositionTable::new(1361702), best_move: None };
+    let mut search = Search {
+        transposition_table: TranspositionTable::new(1361702),
+        best_move: None,
+    };
     //let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid FEN");
     //let mut board = Board::from_fen("8/8/1Kpp4/1P5r/1R3p1k/4P3/6P1/8 b - - 1 2").unwrap();
 
@@ -160,10 +178,10 @@ async fn main() {
                     let y = square_size * (_move.to() / 8) as f32;
 
                     draw_circle(
-                        x + 0.5*square_size,
-                        y + 0.5*square_size,
+                        x + 0.5 * square_size,
+                        y + 0.5 * square_size,
                         square_size / 5.0,
-                        Color::from_rgba(0, 0, 0, (255.0*0.14) as u8)
+                        Color::from_rgba(0, 0, 0, (255.0 * 0.14) as u8),
                     );
                 }
             }
@@ -177,10 +195,10 @@ async fn main() {
             let y = square_size * (king / 8) as f32;
 
             draw_circle(
-                x + 0.5*square_size,
-                y + 0.5*square_size,
+                x + 0.5 * square_size,
+                y + 0.5 * square_size,
                 square_size / 2.0,
-                Color::from_rgba(255, 0, 0, (255.0*0.14) as u8)
+                Color::from_rgba(255, 0, 0, (255.0 * 0.14) as u8),
             );
         }
 
@@ -190,10 +208,10 @@ async fn main() {
             let y = square_size * (square / 8) as f32;
 
             draw_circle(
-                x + 0.5*square_size,
-                y + 0.5*square_size,
+                x + 0.5 * square_size,
+                y + 0.5 * square_size,
                 square_size / 5.0,
-                Color::from_rgba(255, 0, 0, (255.0*0.14) as u8)
+                Color::from_rgba(255, 0, 0, (255.0 * 0.14) as u8),
             );
         }
 
@@ -206,30 +224,33 @@ async fn main() {
             if x > 8.0 || y > 8.0 {
                 active_square = None;
             } else {
-                let target = (y as usize)*8 + (x as usize);
+                let target = (y as usize) * 8 + (x as usize);
 
                 if move_hints.contains(&target) {
                     for _move in moves.clone() {
-                        if _move.from() == active_square.expect("Corrupted board state") && _move.to() == target {
+                        if _move.from() == active_square.expect("Corrupted board state")
+                            && _move.to() == target
+                        {
                             // Force promote to queen
                             if _move.is_promotion() && _move.promotion_piece() != Pieces::QUEEN {
                                 continue;
                             }
 
-                            
                             board.do_move(&_move);
 
-                            if let Some(best_move) = search.find_best_move_iter(&mut board, &mg, 7, Duration::new(1, 0)) {
+                            if let Some(best_move) =
+                                search.find_best_move_iter(&mut board, &mg, 7, Duration::new(1, 0))
+                            {
                                 board.do_move(&best_move);
                             }
-                            
+
                             moves = mg.gen_legal_moves_no_rep(&mut board);
 
                             break;
                         }
                     }
                 }
-                active_square = Some((y as usize)*8 + (x as usize));
+                active_square = Some((y as usize) * 8 + (x as usize));
             }
         }
 

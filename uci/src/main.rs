@@ -1,7 +1,14 @@
-use core::{board::{board::Board, defs::{Pieces, Sides, START_POS}}, movegen::{movegen::MoveGen, moves::Move}, search::{search::Search, ttable::TranspositionTable}};
+use core::{
+    board::{
+        board::Board,
+        defs::{Pieces, Sides, START_POS},
+    },
+    movegen::{movegen::MoveGen, moves::Move},
+    search::{search::Search, ttable::TranspositionTable},
+};
 use std::{io::stdin, panic, time::Duration};
 
-pub struct Engine{
+pub struct Engine {
     board: Board,
     search: Search,
     movegen: MoveGen,
@@ -14,11 +21,11 @@ fn main() {
         board: Board::from_fen(START_POS).unwrap(),
         search: Search {
             transposition_table: TranspositionTable::new(10000000),
-            best_move: None
+            best_move: None,
         },
         movegen: MoveGen,
-        black_time: 1000*60,
-        white_time: 1000*60
+        black_time: 1000 * 60,
+        white_time: 1000 * 60,
     };
 
     loop {
@@ -32,10 +39,10 @@ fn main() {
             "uci" => println!("uciok"),
             "ucinewgame" => {
                 engine.board = Board::from_fen(START_POS).unwrap();
-            },
+            }
             "isready" => {
                 println!("readyok");
-            },
+            }
             "position" => {
                 let mut fen_index = 0;
                 let mut moves_index = 0;
@@ -70,25 +77,35 @@ fn main() {
                         }
                         let from_sq = algebraic_to_square(&mv_str[0..2]);
                         let to_sq = algebraic_to_square(&mv_str[2..4]);
-                        
+
                         for mv in moves {
                             if mv.is_promotion() {
                                 // If parts[move_index] is 4, it will promote to queen
                                 if mv_str.len() == 4 {
-                                    if mv.promotion_piece() != Pieces::QUEEN { continue; }
+                                    if mv.promotion_piece() != Pieces::QUEEN {
+                                        continue;
+                                    }
                                 } else {
                                     match mv_str.chars().nth(4).unwrap_or('q') {
-                                        'n' => { 
-                                            if mv.promotion_piece() != Pieces::KNIGHT { continue; }
+                                        'n' => {
+                                            if mv.promotion_piece() != Pieces::KNIGHT {
+                                                continue;
+                                            }
                                         }
-                                        'r' => { 
-                                            if mv.promotion_piece() != Pieces::ROOK { continue; }
+                                        'r' => {
+                                            if mv.promotion_piece() != Pieces::ROOK {
+                                                continue;
+                                            }
                                         }
-                                        'b' => { 
-                                            if mv.promotion_piece() != Pieces::BISHOP { continue; }
+                                        'b' => {
+                                            if mv.promotion_piece() != Pieces::BISHOP {
+                                                continue;
+                                            }
                                         }
-                                        _ => { 
-                                            if mv.promotion_piece() != Pieces::QUEEN { continue; }
+                                        _ => {
+                                            if mv.promotion_piece() != Pieces::QUEEN {
+                                                continue;
+                                            }
                                         }
                                     }
                                 }
@@ -101,10 +118,9 @@ fn main() {
                         }
                     }
                 }
-            },
+            }
             "go" => {
                 parse_time_parameters(&parts, &mut engine);
-
 
                 let time_left_ms = match engine.board.us() {
                     Sides::WHITE => engine.white_time,
@@ -127,36 +143,44 @@ fn main() {
                 );
                 match best_move {
                     Some(mv) => {
-                        if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
+                        if let Some(entry) = engine
+                            .search
+                            .transposition_table
+                            .get(engine.board.zobrist_hash())
+                        {
                             println!("info score {} depth {}", entry.eval, entry.depth);
                         }
-                        println!(
-                            "bestmove {}",
-                            move_to_alg(&mv)
-                        );
+                        println!("bestmove {}", move_to_alg(&mv));
                     }
                     None => {
                         println!("bestmove 0000");
                     }
                 }
 
-                if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
+                if let Some(entry) = engine
+                    .search
+                    .transposition_table
+                    .get(engine.board.zobrist_hash())
+                {
                     println!("info score {} depth {}", entry.eval, entry.depth);
                 }
-            },
+            }
             "info" => {
-                if let Some(entry) = engine.search.transposition_table.get(engine.board.zobrist_hash()) {
+                if let Some(entry) = engine
+                    .search
+                    .transposition_table
+                    .get(engine.board.zobrist_hash())
+                {
                     println!("info score {} depth {}", entry.eval, entry.depth);
                 }
             }
             "quit" => {
                 break;
             }
-            _ => ()
+            _ => (),
         }
     }
 }
-
 
 fn square_to_algebraic(square: usize) -> String {
     let rank = 8 - (square / 8);
@@ -173,7 +197,10 @@ fn square_to_algebraic(square: usize) -> String {
 pub fn algebraic_to_square(alg: &str) -> usize {
     let chars: Vec<char> = alg.chars().collect();
     if chars.len() != 2 {
-        panic!("Algebraic notation must be exactly 2 characters, e.g. 'a1'. Got: {}", alg);
+        panic!(
+            "Algebraic notation must be exactly 2 characters, e.g. 'a1'. Got: {}",
+            alg
+        );
     }
 
     let file_char = chars[0];
@@ -188,10 +215,13 @@ pub fn algebraic_to_square(alg: &str) -> usize {
         .expect("Invalid rank character");
 
     if file > 7 || rank > 7 {
-        panic!("File '{}' or rank '{}' out of valid range", file_char, rank_char);
+        panic!(
+            "File '{}' or rank '{}' out of valid range",
+            file_char, rank_char
+        );
     }
 
-    ((7-rank) as usize) * 8 + file as usize
+    ((7 - rank) as usize) * 8 + file as usize
 }
 
 fn parse_time_parameters(parts: &[&str], engine: &mut Engine) {
@@ -212,14 +242,18 @@ fn parse_time_parameters(parts: &[&str], engine: &mut Engine) {
 }
 
 fn move_to_alg(_move: &Move) -> String {
-    let mut alg = format!("{}{}", square_to_algebraic(_move.from()), square_to_algebraic(_move.to()));
+    let mut alg = format!(
+        "{}{}",
+        square_to_algebraic(_move.from()),
+        square_to_algebraic(_move.to())
+    );
     if _move.is_promotion() {
         match _move.promotion_piece() {
             Pieces::BISHOP => alg += "b",
             Pieces::KNIGHT => alg += "n",
             Pieces::ROOK => alg += "r",
             Pieces::QUEEN => alg += "q",
-            _ => panic!("Invalid promotion")
+            _ => panic!("Invalid promotion"),
         }
     }
 

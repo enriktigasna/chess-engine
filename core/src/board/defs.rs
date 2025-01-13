@@ -49,5 +49,5 @@ pub enum InvalidFenError {
     InvalidPartCount,
     InvalidRankCount,
     InvalidActiveColor,
-    InvalidCastlingPermission
+    InvalidCastlingPermission,
 }

@@ -2,12 +2,18 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use crate::movegen::{movegen::bitscan_forward, moves::Move};
 
-use super::defs::{Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES, EMPTY};
+use super::defs::{
+    Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES,
+    EMPTY,
+};
 
 pub fn algebraic_to_square(alg: &str) -> usize {
     let chars: Vec<char> = alg.chars().collect();
     if chars.len() != 2 {
-        panic!("Algebraic notation must be exactly 2 characters, e.g. 'a1'. Got: {}", alg);
+        panic!(
+            "Algebraic notation must be exactly 2 characters, e.g. 'a1'. Got: {}",
+            alg
+        );
     }
 
     let file_char = chars[0];
@@ -22,24 +28,25 @@ pub fn algebraic_to_square(alg: &str) -> usize {
         .expect("Invalid rank character");
 
     if file > 7 || rank > 7 {
-        panic!("File '{}' or rank '{}' out of valid range", file_char, rank_char);
+        panic!(
+            "File '{}' or rank '{}' out of valid range",
+            file_char, rank_char
+        );
     }
 
     (rank as usize) * 8 + file as usize
 }
 
-pub struct ZobristRandoms{
+pub struct ZobristRandoms {
     rnd_pieces: [[[u64; 64]; NrOf::PIECE_TYPES]; 2],
     rnd_castling: [u64; 4],
     rnd_side: [u64; 2],
-    rnd_en_passant: [u64; 65]
+    rnd_en_passant: [u64; 65],
 }
 impl ZobristRandoms {
     // musl lcg
-    fn next_random(rand: &mut u64){
-        *rand = rand
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1);
+    fn next_random(rand: &mut u64) {
+        *rand = rand.wrapping_mul(6364136223846793005).wrapping_add(1);
     }
     fn new() -> ZobristRandoms {
         let mut rnd_pieces = [[[0u64; 64]; NrOf::PIECE_TYPES]; 2];
@@ -74,12 +81,11 @@ impl ZobristRandoms {
             rnd_en_passant[i] = rand;
         }
 
-
         ZobristRandoms {
             rnd_pieces,
             rnd_castling,
             rnd_side,
-            rnd_en_passant
+            rnd_en_passant,
         }
     }
 }
@@ -90,20 +96,23 @@ pub struct History {
 }
 impl History {
     pub fn new() -> History {
-        History { stack: vec![], counts: HashMap::with_capacity(2048) }
+        History {
+            stack: vec![],
+            counts: HashMap::with_capacity(2048),
+        }
     }
     pub fn add_entry(&mut self, game_state: &GameState) {
         self.stack.push(game_state.clone());
     }
 
-    pub fn pop_entry(&mut self) -> GameState{
+    pub fn pop_entry(&mut self) -> GameState {
         self.stack.pop().expect("Don't pop an empty history!")
     }
 
     pub fn increment_hash(&mut self, hash: u64) {
         *self.counts.entry(hash).or_insert(0) += 1;
     }
-    
+
     pub fn decrement_hash(&mut self, hash: u64) {
         match self.counts.entry(hash) {
             Entry::Occupied(mut entry) => {
@@ -112,7 +121,7 @@ impl History {
                     entry.remove();
                 }
             }
-            Entry::Vacant(_) => panic!("Trying to undo a move that was never done?")
+            Entry::Vacant(_) => panic!("Trying to undo a move that was never done?"),
         }
     }
 
@@ -125,12 +134,12 @@ impl History {
 pub struct GameState {
     pub active_color: Side,
     pub castling_permissions: u8,
-    pub enpassant_piece: Option<Square>
+    pub enpassant_piece: Option<Square>,
 }
 
 impl GameState {
     pub fn disable_castle(&mut self, side: Side, long_castle: bool) {
-        let mut shift = side*2;
+        let mut shift = side * 2;
         if long_castle {
             shift += 1;
         }
@@ -142,7 +151,7 @@ impl GameState {
     }
 
     pub fn can_castle(&self, side: Side, long_castle: bool) -> bool {
-        let mut shift = side*2;
+        let mut shift = side * 2;
         if long_castle {
             shift += 1;
         }
@@ -155,14 +164,13 @@ impl GameState {
     }
 }
 
-
 pub struct Board {
     pub bb_pieces: [[Bitboard; NrOf::PIECE_TYPES]; 2],
     pub bb_side: [Bitboard; 3],
     pub game_state: GameState,
     pub history: History,
     pub piece_list: [Option<Piece>; NrOf::SQUARES],
-    zobrist_randoms: ZobristRandoms
+    zobrist_randoms: ZobristRandoms,
 }
 
 impl Board {
@@ -185,13 +193,16 @@ impl Board {
                 _ => panic!("Invalid castle, {:?}", _move),
             };
 
-            let rook_remove_offset = if long_castle {-2} else {1};
-            let rook_add_offset = if long_castle {-1} else {1};
-
+            let rook_remove_offset = if long_castle { -2 } else { 1 };
+            let rook_add_offset = if long_castle { -1 } else { 1 };
 
             self.remove_piece((_move.to() as isize + rook_remove_offset) as usize);
-            self.add_piece((_move.to() as isize - rook_add_offset) as usize, Pieces::ROOK, self.us());
-            
+            self.add_piece(
+                (_move.to() as isize - rook_add_offset) as usize,
+                Pieces::ROOK,
+                self.us(),
+            );
+
             // Disable long and short castle
             self.game_state.disable_castle(self.us(), true);
             self.game_state.disable_castle(self.us(), false);
@@ -202,7 +213,7 @@ impl Board {
             match self.us() {
                 Sides::WHITE => self.game_state.enpassant_piece = Some(_move.to() + 8),
                 Sides::BLACK => self.game_state.enpassant_piece = Some(_move.to() - 8),
-                _ => ()
+                _ => (),
             }
         }
 
@@ -210,7 +221,7 @@ impl Board {
             match self.us() {
                 Sides::WHITE => self.remove_piece(_move.to() + 8),
                 Sides::BLACK => self.remove_piece(_move.to() - 8),
-                _ => ()
+                _ => (),
             }
         }
 
@@ -220,15 +231,15 @@ impl Board {
             56 => self.game_state.disable_castle(Sides::WHITE, true),
             7 => self.game_state.disable_castle(Sides::BLACK, false),
             0 => self.game_state.disable_castle(Sides::BLACK, true),
-            _ => ()
+            _ => (),
         }
-        
+
         match _move.from() {
             63 => self.game_state.disable_castle(Sides::WHITE, false),
             56 => self.game_state.disable_castle(Sides::WHITE, true),
             7 => self.game_state.disable_castle(Sides::BLACK, false),
             0 => self.game_state.disable_castle(Sides::BLACK, true),
-            _ => ()
+            _ => (),
         }
 
         // Remove castling if move is king
@@ -287,11 +298,11 @@ impl Board {
                 Sides::WHITE => {
                     let cap_square = _move.to() + 8;
                     self.add_piece(cap_square, Pieces::PAWN, Sides::BLACK);
-                },
+                }
                 Sides::BLACK => {
                     let cap_square = _move.to() - 8;
                     self.add_piece(cap_square, Pieces::PAWN, Sides::WHITE);
-                },
+                }
                 _ => {}
             }
         }
@@ -300,8 +311,8 @@ impl Board {
             let delta = _move.to() as isize - _move.from() as isize;
             let long_castle = match delta {
                 -2 => true,
-                 2 => false,
-                 _ => panic!("Invalid castle in undo_move"),
+                2 => false,
+                _ => panic!("Invalid castle in undo_move"),
             };
 
             let rook_from = if long_castle {
@@ -358,7 +369,7 @@ impl Board {
     pub fn us(&self) -> Side {
         self.game_state.active_color
     }
-    
+
     pub fn them(&self) -> Side {
         self.game_state.active_color ^ 1
     }
@@ -366,40 +377,38 @@ impl Board {
     pub fn is_occupied(&self, side: Side, square: Square) -> bool {
         self.get_all_pieces(side) >> square & 1 == 1
     }
-    
+
     pub fn is_enpassant(&self, square: Square) -> bool {
         match self.game_state.enpassant_piece {
             None => false,
-            Some(ep_square) => {square == ep_square}
+            Some(ep_square) => square == ep_square,
         }
     }
-
 
     pub fn from_fen(fen_string: &str) -> Result<Board, InvalidFenError> {
         let mut bb_pieces = [[EMPTY; NrOf::PIECE_TYPES]; 2];
         let parts: Vec<&str> = fen_string.split(' ').collect();
-        
+
         if parts.len() < 4 {
-            return Err(InvalidFenError::InvalidPartCount)
+            return Err(InvalidFenError::InvalidPartCount);
         }
 
         let ranks: Vec<&str> = parts[0].split('/').collect();
         if ranks.len() != 8 {
-            return Err(InvalidFenError::InvalidRankCount)
+            return Err(InvalidFenError::InvalidRankCount);
         }
-
 
         let active_color = match parts[1] {
             "w" => Sides::WHITE,
             "b" => Sides::BLACK,
-            _ => return Err(InvalidFenError::InvalidActiveColor)
+            _ => return Err(InvalidFenError::InvalidActiveColor),
         };
 
         for rank in 0..NrOf::RANKS {
             let mut file: usize = 0;
             // For each rank
             for c in ranks[rank].chars() {
-                let square_index = file + (rank*8);
+                let square_index = file + (rank * 8);
 
                 if c.is_digit(10) {
                     file += c.to_digit(10).unwrap() as usize;
@@ -441,7 +450,7 @@ impl Board {
         let bb_side: [Bitboard; 3] = [
             bb_pieces[Sides::WHITE].iter().fold(0, |a, b| a | b),
             bb_pieces[Sides::BLACK].iter().fold(0, |a, b| a | b),
-            bb_pieces.into_iter().flatten().fold(0, |a, b| a | b)
+            bb_pieces.into_iter().flatten().fold(0, |a, b| a | b),
         ];
 
         let mut castling_permissions = 0;
@@ -452,7 +461,7 @@ impl Board {
                 'k' => castling_permissions |= 1 << 2,
                 'q' => castling_permissions |= 1 << 3,
                 '-' => (),
-                _ => return Err(InvalidFenError::InvalidCastlingPermission)
+                _ => return Err(InvalidFenError::InvalidCastlingPermission),
             }
         }
 
@@ -460,18 +469,24 @@ impl Board {
         if parts[3] != "-" {
             enpassant_piece = Some(algebraic_to_square(parts[3]));
         }
-        
 
         let game_state: GameState = GameState {
             active_color,
             castling_permissions,
-            enpassant_piece
+            enpassant_piece,
         };
 
         let history = History::new(); // Empty history, FEN doesn't give history information
 
         let zobrist_randoms = ZobristRandoms::new();
-    
-        Ok(Board { bb_pieces, bb_side, game_state, history, zobrist_randoms, piece_list })
+
+        Ok(Board {
+            bb_pieces,
+            bb_side,
+            game_state,
+            history,
+            zobrist_randoms,
+            piece_list,
+        })
     }
 }

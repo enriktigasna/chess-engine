@@ -1,11 +1,13 @@
 use std::vec;
 
-
 // Low hanging fruit:
 // replace bitscan_forward with squares_in iterator
 // PRE_ALLOCATE STACK SLICES INSTEAD OF VEC
 
-use crate::board::{board::Board, defs::{Bitboard, Pieces, Side, Sides}};
+use crate::board::{
+    board::Board,
+    defs::{Bitboard, Pieces, Side, Sides},
+};
 
 use super::moves::{LeapingMagics, Move};
 
@@ -16,7 +18,6 @@ pub fn bitscan_forward(bb: u64) -> Option<usize> {
         Some(bb.trailing_zeros() as usize)
     }
 }
-
 
 pub struct MoveGen;
 impl MoveGen {
@@ -37,7 +38,7 @@ impl MoveGen {
         let mut pawns = our_pawns;
         while let Some(square) = bitscan_forward(pawns) {
             pawns &= pawns - 1;
-            let rank = square / 8 ;
+            let rank = square / 8;
             let steps = if rank == start_rank { 2 } else { 1 };
 
             for i in 1..=steps {
@@ -59,14 +60,18 @@ impl MoveGen {
             }
 
             for &offset in attacks {
-                if (square % 8 < 1 && offset == attacks[0]) || (square % 8 > 6 && offset == attacks[1]) {
+                if (square % 8 < 1 && offset == attacks[0])
+                    || (square % 8 > 6 && offset == attacks[1])
+                {
                     continue;
                 }
 
                 let target = (square as isize + offset) as usize;
                 let target_rank = target / 8;
 
-                if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_occupied(them, target) {
+                if (square as isize / 8 - target as isize / 8).abs() == 1
+                    && board.is_occupied(them, target)
+                {
                     if target_rank == promotion_rank {
                         moves.push(Move::new_promotion(square, target, board, Pieces::QUEEN));
                         moves.push(Move::new_promotion(square, target, board, Pieces::ROOK));
@@ -76,17 +81,17 @@ impl MoveGen {
                         moves.push(Move::new(square, target, board));
                     }
                 }
-                
-                if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_enpassant(target) {
+
+                if (square as isize / 8 - target as isize / 8).abs() == 1
+                    && board.is_enpassant(target)
+                {
                     moves.push(Move::new_enpassant(square, target, board));
                 }
-
             }
         }
 
         moves
     }
-
 
     pub fn gen_pawn_attacks(&self, board: &Board) -> Vec<Move> {
         let mut moves: Vec<Move> = Vec::with_capacity(20);
@@ -105,7 +110,9 @@ impl MoveGen {
         while let Some(square) = bitscan_forward(pawns) {
             pawns &= pawns - 1;
             for &offset in attacks {
-                if (square % 8 < 1 && offset == attacks[0]) || (square % 8 > 6 && offset == attacks[1]) {
+                if (square % 8 < 1 && offset == attacks[0])
+                    || (square % 8 > 6 && offset == attacks[1])
+                {
                     continue;
                 }
                 let target = (square as isize + offset) as usize;
@@ -113,11 +120,12 @@ impl MoveGen {
                 if (square as isize / 8 - target as isize / 8).abs() == 1 {
                     moves.push(Move::new(square, target, board));
                 }
-                
-                if (square as isize / 8 - target as isize / 8).abs() == 1 && board.is_enpassant(target) {
+
+                if (square as isize / 8 - target as isize / 8).abs() == 1
+                    && board.is_enpassant(target)
+                {
                     moves.push(Move::new_enpassant(square, target, board));
                 }
-
             }
         }
 
@@ -136,10 +144,11 @@ impl MoveGen {
             while let Some(target) = bitscan_forward(target_attack_board as u64) {
                 target_attack_board &= target_attack_board - 1;
 
-                if board.is_occupied(us, target) { continue; }
+                if board.is_occupied(us, target) {
+                    continue;
+                }
                 moves.push(Move::new(square, target, board));
             }
-
         }
 
         moves
@@ -164,20 +173,33 @@ impl MoveGen {
                     target = (target as isize + offset) as usize;
                     let target_rank = target / 8;
                     let target_file = target % 8;
-                    
-                    if target > 63 { break; }
-                    
+
+                    if target > 63 {
+                        break;
+                    }
 
                     // Break if it went out of bounds
                     match offset.abs() {
-                        1 => if square_rank != target_rank { break }
-                        8 => if square_file != target_file { break }
-                        _ => ()
+                        1 => {
+                            if square_rank != target_rank {
+                                break;
+                            }
+                        }
+                        8 => {
+                            if square_file != target_file {
+                                break;
+                            }
+                        }
+                        _ => (),
                     }
 
-                    if board.is_occupied(us, target) { break; }
+                    if board.is_occupied(us, target) {
+                        break;
+                    }
                     moves.push(Move::new(square, target, board));
-                    if board.is_occupied(them, target) { break; }
+                    if board.is_occupied(them, target) {
+                        break;
+                    }
                 }
             }
         }
@@ -203,21 +225,36 @@ impl MoveGen {
                     target = (target as isize + offset) as usize;
                     let target_rank = target / 8;
                     let target_file = target % 8;
-                    
-                    if target > 63 { break; }
-                    
+
+                    if target > 63 {
+                        break;
+                    }
 
                     // Break if it went out of bounds
                     // Casts go crazy
                     match offset.abs() {
-                        7 => if target_rank + target_file != square_rank + square_file {break},
-                        9 => if target_rank as isize - target_file as isize != square_rank as isize - square_file as isize {break},
-                        _ => ()
+                        7 => {
+                            if target_rank + target_file != square_rank + square_file {
+                                break;
+                            }
+                        }
+                        9 => {
+                            if target_rank as isize - target_file as isize
+                                != square_rank as isize - square_file as isize
+                            {
+                                break;
+                            }
+                        }
+                        _ => (),
                     }
 
-                    if board.is_occupied(us, target) { break; }
+                    if board.is_occupied(us, target) {
+                        break;
+                    }
                     moves.push(Move::new(square, target, board));
-                    if board.is_occupied(them, target) { break; }
+                    if board.is_occupied(them, target) {
+                        break;
+                    }
                 }
             }
         }
@@ -243,23 +280,46 @@ impl MoveGen {
                     target = (target as isize + offset) as usize;
                     let target_rank = target / 8;
                     let target_file = target % 8;
-                    
-                    if target > 63 { break; }
-                    
+
+                    if target > 63 {
+                        break;
+                    }
 
                     // Break if it went out of bounds
                     // Casts go crazy
                     match offset.abs() {
-                        7 => if target_rank + target_file != square_rank + square_file {break},
-                        9 => if target_rank as isize - target_file as isize != square_rank as isize - square_file as isize {break},
-                        1 => if square_rank != target_rank { break }
-                        8 => if square_file != target_file { break }
-                        _ => ()
+                        7 => {
+                            if target_rank + target_file != square_rank + square_file {
+                                break;
+                            }
+                        }
+                        9 => {
+                            if target_rank as isize - target_file as isize
+                                != square_rank as isize - square_file as isize
+                            {
+                                break;
+                            }
+                        }
+                        1 => {
+                            if square_rank != target_rank {
+                                break;
+                            }
+                        }
+                        8 => {
+                            if square_file != target_file {
+                                break;
+                            }
+                        }
+                        _ => (),
                     }
 
-                    if board.is_occupied(us, target) { break; }
+                    if board.is_occupied(us, target) {
+                        break;
+                    }
                     moves.push(Move::new(square, target, board));
-                    if board.is_occupied(them, target) { break; }
+                    if board.is_occupied(them, target) {
+                        break;
+                    }
                 }
             }
         }
@@ -279,10 +339,11 @@ impl MoveGen {
             while let Some(target) = bitscan_forward(target_attack_board as u64) {
                 target_attack_board &= target_attack_board - 1;
 
-                if board.is_occupied(us, target) { continue; }
+                if board.is_occupied(us, target) {
+                    continue;
+                }
                 moves.push(Move::new(square, target, board));
             }
-
         }
 
         moves
@@ -294,12 +355,15 @@ impl MoveGen {
         let them = board.them();
 
         let our_king = bitscan_forward(board.get_pieces(us, Pieces::KING)).expect("King not found");
-        
+
         let attack_bb = self.gen_attack_bitboard(board, them);
 
         // Short castle
         if board.game_state.can_castle(us, false) {
-            if board.get_piece_at(our_king + 1).is_none() && board.get_piece_at(our_king + 2).is_none() && !self.in_check(board, us) {
+            if board.get_piece_at(our_king + 1).is_none()
+                && board.get_piece_at(our_king + 2).is_none()
+                && !self.in_check(board, us)
+            {
                 if (1 << our_king & attack_bb) == 0 && (1 << our_king + 1 & attack_bb) == 0 {
                     moves.push(Move::new_castle(our_king, our_king + 2, board));
                 }
@@ -307,7 +371,11 @@ impl MoveGen {
         }
 
         if board.game_state.can_castle(us, true) {
-            if board.get_piece_at(our_king - 1).is_none() && board.get_piece_at(our_king - 2).is_none() && board.get_piece_at(our_king - 3).is_none() && !self.in_check(board, us){
+            if board.get_piece_at(our_king - 1).is_none()
+                && board.get_piece_at(our_king - 2).is_none()
+                && board.get_piece_at(our_king - 3).is_none()
+                && !self.in_check(board, us)
+            {
                 if (1 << our_king & attack_bb) == 0 && (1 << our_king - 1 & attack_bb) == 0 {
                     moves.push(Move::new_castle(our_king, our_king - 2, board));
                 }
@@ -324,7 +392,7 @@ impl MoveGen {
         let backup = board.game_state.active_color;
         board.game_state.active_color = side;
         let mut moves = Vec::with_capacity(218);
-        
+
         moves.append(&mut self.gen_pawn_attacks(board));
         moves.append(&mut self.gen_knight_moves(board));
         moves.append(&mut self.gen_rook_moves(board));
@@ -333,15 +401,14 @@ impl MoveGen {
         moves.append(&mut self.gen_king_moves(board));
 
         for _move in moves {
-            bitboard |=  1 << _move.to();
+            bitboard |= 1 << _move.to();
         }
 
-        
         board.game_state.active_color = backup;
 
         bitboard
     }
-    
+
     pub fn in_check(&self, board: &mut Board, side: Side) -> bool {
         let king = board.get_pieces(side, Pieces::KING);
         king & self.gen_attack_bitboard(board, side ^ 1) != 0
@@ -359,7 +426,7 @@ impl MoveGen {
 
         moves
     }
-    
+
     pub fn gen_legal_moves_no_rep(&self, board: &mut Board) -> Vec<Move> {
         let count = board.history.count_hash(board.zobrist_hash());
         if count >= 3 {
@@ -368,7 +435,7 @@ impl MoveGen {
 
         self.gen_legal_moves(board)
     }
-    
+
     pub fn gen_legal_moves(&self, board: &mut Board) -> Vec<Move> {
         let mut pseudo_legal = self.gen_moves(board);
         let us = board.us();
@@ -381,18 +448,16 @@ impl MoveGen {
         });
 
         let points = [1, 3, 3, 5, 8, 0];
-        
+
         pseudo_legal.sort_by(|a, b| {
-            let score_a = a.capture()
-                .map(|cap| {
-                    points[cap] * 10 - points[a.piece()]
-                })
+            let score_a = a
+                .capture()
+                .map(|cap| points[cap] * 10 - points[a.piece()])
                 .unwrap_or(0);
 
-            let score_b = b.capture()
-                .map(|cap| {
-                    points[cap] * 10 - points[b.piece()]
-                })
+            let score_b = b
+                .capture()
+                .map(|cap| points[cap] * 10 - points[b.piece()])
                 .unwrap_or(0);
 
             score_b.cmp(&score_a)

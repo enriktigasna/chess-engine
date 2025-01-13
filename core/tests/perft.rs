@@ -1,5 +1,10 @@
-
-use core::{board::{board::Board, defs::{Pieces, Sides, START_POS}}, movegen::movegen::MoveGen};
+use core::{
+    board::{
+        board::Board,
+        defs::{Pieces, Sides, START_POS},
+    },
+    movegen::movegen::MoveGen,
+};
 
 #[test]
 fn test_from_start() {
@@ -17,7 +22,9 @@ fn test_from_start() {
 #[test]
 fn test_from_kiwipete() {
     let mg = MoveGen;
-    let mut kiwipete  = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").unwrap();
+    let mut kiwipete =
+        Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ")
+            .unwrap();
     assert_eq!(test_perft_nodes_v2(1, &mg, &mut kiwipete), 48);
     assert_eq!(test_perft_nodes_v2(2, &mg, &mut kiwipete), 2039);
     assert_eq!(test_perft_nodes_v2(3, &mg, &mut kiwipete), 97862);
@@ -27,7 +34,8 @@ fn test_from_kiwipete() {
 #[test]
 fn test_from_petrovic() {
     let mg = MoveGen;
-    let mut board  = Board::from_fen("R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1").unwrap();
+    let mut board =
+        Board::from_fen("R6R/3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/pp1Q4/kBNN1KB1 w - - 0 1").unwrap();
     assert_eq!(test_perft_nodes_v2(1, &mg, &mut board), 218);
     assert_eq!(test_perft_nodes_v2(2, &mg, &mut board), 99);
     assert_eq!(test_perft_nodes_v2(3, &mg, &mut board), 19073);
@@ -37,7 +45,7 @@ fn test_from_petrovic() {
 #[test]
 fn test_from_pos3() {
     let mg = MoveGen;
-    let mut board  = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ").unwrap();
+    let mut board = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ").unwrap();
     assert_eq!(test_perft_nodes_v2(1, &mg, &mut board), 14);
     assert_eq!(test_perft_nodes_v2(2, &mg, &mut board), 191);
     assert_eq!(test_perft_nodes_v2(3, &mg, &mut board), 2812);
@@ -46,7 +54,7 @@ fn test_from_pos3() {
 
 fn test_perft_nodes_v2(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
     let mut count: usize = 0;
-    
+
     if depth == 1 {
         return mg.gen_legal_moves(board).len();
     }
@@ -55,20 +63,27 @@ fn test_perft_nodes_v2(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
 
     for _move in moves {
         board.do_move(&_move);
-        if mg.in_check(board, board.them()) { board.undo_move(&_move); continue; }
+        if mg.in_check(board, board.them()) {
+            board.undo_move(&_move);
+            continue;
+        }
         count += test_perft_nodes_v2(depth - 1, mg, board);
         board.undo_move(&_move);
     }
 
-    count 
+    count
 }
 
 fn test_perft_captures(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
     let mut count: usize = 0;
     let moves = mg.gen_legal_moves(board);
-    
+
     if depth == 1 {
-        return moves.into_iter().filter(|_move| _move.capture().is_some()).collect::<Vec<_>>().len();
+        return moves
+            .into_iter()
+            .filter(|_move| _move.capture().is_some())
+            .collect::<Vec<_>>()
+            .len();
     }
 
     for _move in moves {
@@ -77,5 +92,5 @@ fn test_perft_captures(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
         board.undo_move(&_move);
     }
 
-    count 
+    count
 }

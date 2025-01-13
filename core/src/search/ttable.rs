@@ -2,6 +2,12 @@ use std::vec;
 
 use crate::{board::defs::ZobristHash, movegen::moves::Move};
 
+#[derive(Clone, PartialEq)]
+pub enum MoveType {
+    Minimum,
+    Exact,
+}
+
 #[derive(Clone)]
 // 37 Byte entry
 pub struct TranspositionEntry {
@@ -9,13 +15,14 @@ pub struct TranspositionEntry {
     pub best_move: Move,
     pub eval: i32,
     pub depth: usize,
-    pub age: usize
+    pub age: usize,
+    pub move_type: MoveType,
 }
 
 pub struct TranspositionTable {
     table: Vec<TranspositionEntry>,
     max_size: usize,
-    pub age: usize
+    pub age: usize,
 }
 
 impl TranspositionTable {
@@ -26,13 +33,16 @@ impl TranspositionTable {
                 best_move: Move(0),
                 eval: 0,
                 depth: 0,
-                age: 0
+                age: 0,
+                move_type: MoveType::Exact
             };
             max_size
         ];
 
         TranspositionTable {
-            table, max_size, age: 0
+            table,
+            max_size,
+            age: 0,
         }
     }
 
@@ -40,7 +50,6 @@ impl TranspositionTable {
         let index = self.index(hash);
         let entry = &self.table[index];
 
-        //println!("{hash}");
         if entry.key == hash {
             Some(entry.clone())
         } else {
@@ -55,7 +64,9 @@ impl TranspositionTable {
         match existing_entry.key {
             0 => self.table[index] = entry,
             _ => {
-                if entry.depth > existing_entry.depth || (entry.depth >= existing_entry.depth && entry.age > existing_entry.age) {
+                if entry.depth > existing_entry.depth
+                    || (entry.depth >= existing_entry.depth && entry.age > existing_entry.age)
+                {
                     self.table[index] = entry
                 }
             }

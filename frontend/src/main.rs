@@ -91,12 +91,12 @@ async fn main() {
     let piece_assets = PieceAssets::new().await;
 
     let mg = MoveGen;
-    let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
+    //let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
     let mut search = Search {
         transposition_table: TranspositionTable::new(1361702),
         best_move: None,
     };
-    //let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid FEN");
+    let mut board = Board::from_fen("8/3r2p1/1P2k3/p2p3p/3R2p1/4P3/1PP3PP/2K2R2 b - - 0 33").expect("Invalid FEN");
     //let mut board = Board::from_fen("8/8/1Kpp4/1P5r/1R3p1k/4P3/6P1/8 b - - 1 2").unwrap();
 
     let mut moves = mg.gen_legal_moves(&mut board);

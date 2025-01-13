@@ -130,7 +130,7 @@ fn main() {
                 let ten_percent = (time_left_ms as f64 * 0.1).round() as u64;
                 let ten_percent_duration = Duration::from_millis(ten_percent);
 
-                let mut search_duration = Duration::from_secs(2);
+                let mut search_duration = Duration::from_secs(5);
                 if ten_percent_duration < search_duration {
                     search_duration = ten_percent_duration;
                 }
@@ -148,7 +148,7 @@ fn main() {
                             .transposition_table
                             .get(engine.board.zobrist_hash())
                         {
-                            println!("info score {} depth {}", entry.eval, entry.depth);
+                            println!("info score cp {} depth {}", entry.eval, entry.depth);
                         }
                         println!("bestmove {}", move_to_alg(&mv));
                     }

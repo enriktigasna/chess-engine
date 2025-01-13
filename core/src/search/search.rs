@@ -78,7 +78,9 @@ impl Search {
         if moves.len() == 0 {
             return None;
         }
-        let score = self.negamax(
+
+        self.best_move = Some(moves[0].clone());
+        self.negamax(
             board,
             mg,
             start_time,
@@ -137,7 +139,6 @@ impl Search {
         }
 
         let mut best_move = moves[0].clone();
-
         for mv in moves {
             board.do_move(&mv);
             let score = -self.negamax(
@@ -235,14 +236,12 @@ impl Search {
     }
 
     pub fn put_move_first(&self, moves: &mut Vec<Move>, _move: &Move) {
-        let index = moves
-            .iter()
-            .enumerate()
-            .find(|&r| r.1 .0 == _move.0)
-            .unwrap()
-            .0;
-
-        moves.swap(0, index);
+        if let Some(index) = moves.iter().position(|m| m.0 == _move.0) {
+            // Remove the move from its current position
+            let move_to_front = moves.remove(index);
+            // Insert the move at the beginning
+            moves.insert(0, move_to_front);
+        }
     }
 
     pub fn static_eval(&self, board: &mut Board) -> i32 {

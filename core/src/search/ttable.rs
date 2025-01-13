@@ -59,18 +59,7 @@ impl TranspositionTable {
 
     pub fn insert(&mut self, entry: TranspositionEntry) {
         let index = self.index(entry.key);
-        let existing_entry = &self.table[index];
-
-        match existing_entry.key {
-            0 => self.table[index] = entry,
-            _ => {
-                if entry.depth > existing_entry.depth
-                    || (entry.depth >= existing_entry.depth && entry.age > existing_entry.age)
-                {
-                    self.table[index] = entry
-                }
-            }
-        };
+        self.table[index] = entry;
     }
 
     pub fn increment_age(&mut self) {

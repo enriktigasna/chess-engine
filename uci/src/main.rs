@@ -13,7 +13,9 @@ fn main() {
     let mut engine = Engine {
         board: Board::from_fen(START_POS).unwrap(),
         search: Search {
-            transposition_table: TranspositionTable::new(10000000)},
+            transposition_table: TranspositionTable::new(10000000),
+            best_move: None
+        },
         movegen: MoveGen,
         black_time: 1000*60,
         white_time: 1000*60

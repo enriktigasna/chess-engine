@@ -398,7 +398,7 @@ impl MoveGen {
         self.gen_knight_moves(board, &mut moves);
         self.gen_rook_moves(board, &mut moves);
         self.gen_bishop_moves(board, &mut moves);
-        self.gen_queen_moves(board, &mut  moves);
+        self.gen_queen_moves(board, &mut moves);
         self.gen_king_moves(board, &mut moves);
         self.gen_castle_moves(board, &mut moves);
 

@@ -95,7 +95,7 @@ async fn main() {
     let mut search = Search {
         transposition_table: TranspositionTable::new(1361702),
         best_move: None,
-        psqt_cache: Box::new([[[0; 64]; 6]; 257])
+        psqt_cache: Box::new([[[0; 64]; 6]; 257]),
     };
 
     search.init_psqt_cache();

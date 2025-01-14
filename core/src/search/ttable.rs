@@ -10,6 +10,7 @@ pub enum MoveType {
 
 #[derive(Clone)]
 // 37 Byte entry
+// TODO: Remove age, depth as u16
 pub struct TranspositionEntry {
     pub key: ZobristHash,
     pub best_move: Move,

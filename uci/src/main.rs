@@ -20,9 +20,9 @@ fn main() {
     let mut engine = Engine {
         board: Board::from_fen(START_POS).unwrap(),
         search: Search {
-            transposition_table: TranspositionTable::new(10000000),
+            transposition_table: TranspositionTable::new(2000000),
             best_move: None,
-            psqt_cache: Box::new([[[0; 64]; 6]; 257])
+            psqt_cache: Box::new([[[0; 64]; 6]; 257]),
         },
         movegen: MoveGen,
         black_time: 1000 * 60,
@@ -146,13 +146,6 @@ fn main() {
                 );
                 match best_move {
                     Some(mv) => {
-                        if let Some(entry) = engine
-                            .search
-                            .transposition_table
-                            .get(engine.board.zobrist_hash())
-                        {
-                            println!("info score cp {} depth {}", entry.eval, entry.depth);
-                        }
                         println!("bestmove {}", move_to_alg(&mv));
                     }
                     None => {

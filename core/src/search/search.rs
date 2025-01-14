@@ -32,7 +32,7 @@ pub const FLIP: [usize; 64] = [
 pub struct Search {
     pub transposition_table: TranspositionTable,
     pub best_move: Option<Move>,
-    pub psqt_cache: Box<[[[i32; 64]; 6]; 257]>
+    pub psqt_cache: Box<[[[i32; 64]; 6]; 257]>,
 }
 impl Search {
     // Refactor into a factory constructor! (cache shouldnt be public too)
@@ -88,7 +88,7 @@ impl Search {
         }
 
         self.best_move = Some(moves[0].clone());
-        let score= self.negamax(
+        let score = self.negamax(
             board,
             mg,
             start_time,
@@ -113,7 +113,7 @@ impl Search {
         duration: Duration,
         mut alpha: i32,
         beta: i32,
-        depth: usize,
+        mut depth: usize,
         ply: usize,
     ) -> i32 {
         let hash = board.zobrist_hash();
@@ -130,6 +130,7 @@ impl Search {
         let mut best_value = i32::MIN + 1;
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
+
         if moves.len() == 0 {
             if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
                 return i32::MIN + 1;
@@ -139,8 +140,14 @@ impl Search {
 
         if let Some(entry) = self.transposition_table.get(hash) {
             self.put_move_first(&mut moves, &entry.best_move);
-            if entry.depth > depth && entry.move_type == MoveType::Exact {
-                return entry.eval;
+            if entry.depth > depth {
+                if entry.move_type == MoveType::Exact {
+                    return entry.eval;
+                }
+
+                if entry.move_type == MoveType::Minimum && entry.eval >= beta {
+                    return entry.eval
+                }
             }
         }
 
@@ -258,8 +265,7 @@ impl Search {
         eval += self.apply_psqt(board, psqt_set);
         let side2move = match board.us() {
             Sides::WHITE => 1,
-            Sides::BLACK => -1,
-            _ => panic!("Fake"),
+            _ => -1,
         };
 
         eval * side2move
@@ -270,7 +276,7 @@ impl Search {
 
         self.psqt_cache[weight as usize]
     }
-    
+
     pub fn gen_psqt_set(&self, weight: i32) -> [[i32; 64]; 6] {
         [
             self.apply_weight(PieceTables::EARLY_PAWN, PieceTables::LATE_PAWN, weight),
@@ -286,7 +292,7 @@ impl Search {
         let mut out = [0; 64];
 
         for square in 0..64 {
-            out[square] = (midgame[square]*(256-weight) + endgame[square]*weight) / 256
+            out[square] = (midgame[square] * (256 - weight) + endgame[square] * weight) / 256
         }
 
         out

@@ -22,11 +22,14 @@ fn main() {
         search: Search {
             transposition_table: TranspositionTable::new(10000000),
             best_move: None,
+            psqt_cache: Box::new([[[0; 64]; 6]; 257])
         },
         movegen: MoveGen,
         black_time: 1000 * 60,
         white_time: 1000 * 60,
     };
+
+    engine.search.init_psqt_cache();
 
     loop {
         let mut input = String::new();
@@ -138,7 +141,7 @@ fn main() {
                 let best_move = engine.search.find_best_move_iter(
                     &mut engine.board,
                     &engine.movegen,
-                    8,
+                    20,
                     search_duration,
                 );
                 match best_move {
@@ -155,14 +158,6 @@ fn main() {
                     None => {
                         println!("bestmove 0000");
                     }
-                }
-
-                if let Some(entry) = engine
-                    .search
-                    .transposition_table
-                    .get(engine.board.zobrist_hash())
-                {
-                    println!("info score {} depth {}", entry.eval, entry.depth);
                 }
             }
             "info" => {

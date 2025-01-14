@@ -6,3 +6,5 @@ members = [
     "benchmarker",
     "uci"
 ]
+
+rustflags = ["target-feature=+popcnt"]

@@ -32,8 +32,16 @@ pub const FLIP: [usize; 64] = [
 pub struct Search {
     pub transposition_table: TranspositionTable,
     pub best_move: Option<Move>,
+    pub psqt_cache: Box<[[[i32; 64]; 6]; 257]>
 }
 impl Search {
+    // Refactor into a factory constructor! (cache shouldnt be public too)
+    pub fn init_psqt_cache(&mut self) {
+        for weight in 0..257 {
+            self.psqt_cache[weight] = self.gen_psqt_set(weight as i32);
+        }
+    }
+
     pub fn find_best_move_iter(
         &mut self,
         board: &mut Board,
@@ -91,6 +99,9 @@ impl Search {
             0,
         );
 
+        if start_time.elapsed() < duration {
+            println!("info score cp {} depth {}", score, depth);
+        }
         return self.best_move.clone();
     }
 
@@ -262,6 +273,10 @@ impl Search {
     pub fn get_psqt_set(&self, board: &Board) -> [[i32; 64]; 6] {
         let weight = self.get_phase(board);
 
+        self.psqt_cache[weight as usize]
+    }
+    
+    pub fn gen_psqt_set(&self, weight: i32) -> [[i32; 64]; 6] {
         [
             self.apply_weight(PieceTables::EARLY_PAWN, PieceTables::LATE_PAWN, weight),
             self.apply_weight(PieceTables::EARLY_BISHOP, PieceTables::LATE_BISHOP, weight),
@@ -276,7 +291,7 @@ impl Search {
         let mut out = [0; 64];
 
         for square in 0..64 {
-            out[square] = (midgame[square]*(256 - weight) + endgame[square]*weight) / 256
+            out[square] = (midgame[square]*(256-weight) + endgame[square]*weight) / 256
         }
 
         out
@@ -292,7 +307,7 @@ impl Search {
             }
         }
 
-        (phase * 256) / 24
+        ((phase * 256) / 24).max(0)
     }
 
     pub fn apply_psqt(&self, board: &Board, psqt: [[i32; 64]; 6]) -> i32 {

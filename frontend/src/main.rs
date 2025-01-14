@@ -95,7 +95,11 @@ async fn main() {
     let mut search = Search {
         transposition_table: TranspositionTable::new(1361702),
         best_move: None,
+        psqt_cache: Box::new([[[0; 64]; 6]; 257])
     };
+
+    search.init_psqt_cache();
+
     //let mut board = Board::from_fen("8/3r2p1/1P2k3/p2p3p/3R2p1/4P3/1PP3PP/2K2R2 b - - 0 33").expect("Invalid FEN");
     //let mut board = Board::from_fen("8/8/1Kpp4/1P5r/1R3p1k/4P3/6P1/8 b - - 1 2").unwrap();
 
@@ -239,7 +243,7 @@ async fn main() {
                             board.do_move(&_move);
 
                             if let Some(best_move) =
-                                search.find_best_move_iter(&mut board, &mg, 7, Duration::new(1, 0))
+                                search.find_best_move_iter(&mut board, &mg, 20, Duration::new(1, 0))
                             {
                                 board.do_move(&best_move);
                             }

@@ -117,11 +117,6 @@ impl Search {
         ply: usize,
     ) -> i32 {
         let hash = board.zobrist_hash();
-        /*if let Some(entry) = self.transposition_table.get(hash) {
-            if entry.depth >= depth {
-                return entry.eval;
-            }
-        }*/
 
         if depth == 0 {
             //return self.quiesce(board, mg, -beta, -alpha, 3)

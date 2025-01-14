@@ -6,7 +6,7 @@ use std::vec;
 
 use crate::board::{
     board::Board,
-    defs::{Bitboard, Pieces, Side, Sides},
+    defs::{Bitboard, Pieces, Side, Sides, Square},
 };
 
 use super::moves::{LeapingMagics, Move};
@@ -21,8 +21,8 @@ pub fn bitscan_forward(bb: u64) -> Option<usize> {
 
 pub struct MoveGen;
 impl MoveGen {
-    pub fn gen_pawn_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_pawn_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+        // Step 1. Make function to return a forward bitboard for a given pawn
         let us = board.us();
         let them = board.them();
 
@@ -34,10 +34,10 @@ impl MoveGen {
             _ => panic!("Invalid board state"),
         };
 
-        // Easier and more efficient to have a lookup table for pawn attacks and forward moves
         let mut pawns = our_pawns;
         while let Some(square) = bitscan_forward(pawns) {
             pawns &= pawns - 1;
+
             let rank = square / 8;
             let steps = if rank == start_rank { 2 } else { 1 };
 
@@ -89,12 +89,9 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
-    pub fn gen_pawn_attacks(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_pawn_attacks(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
 
         let our_pawns = board.get_pieces(us, Pieces::PAWN);
@@ -128,12 +125,9 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
-    pub fn gen_knight_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_knight_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
 
         let mut our_knights = board.get_pieces(us, Pieces::KNIGHT);
@@ -150,12 +144,9 @@ impl MoveGen {
                 moves.push(Move::new(square, target, board));
             }
         }
-
-        moves
     }
 
-    pub fn gen_rook_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_rook_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
         let them = board.them();
 
@@ -203,12 +194,9 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
-    pub fn gen_bishop_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_bishop_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 4] = &[9, -9, 7, -7];
@@ -258,12 +246,9 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
-    pub fn gen_queen_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_queen_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 8] = &[9, -9, 7, -7, 1, -1, 8, -8];
@@ -323,12 +308,9 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
-    pub fn gen_king_moves(&self, board: &Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(8);
+    pub fn gen_king_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
 
         let mut our_king = board.get_pieces(us, Pieces::KING);
@@ -345,12 +327,9 @@ impl MoveGen {
                 moves.push(Move::new(square, target, board));
             }
         }
-
-        moves
     }
 
-    pub fn gen_castle_moves(&self, board: &mut Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = Vec::with_capacity(20);
+    pub fn gen_castle_moves(&self, board: &mut Board, moves: &mut Vec<Move>) {
         let us = board.us();
         let them = board.them();
 
@@ -381,8 +360,6 @@ impl MoveGen {
                 }
             }
         }
-
-        moves
     }
 
     // NEED TO REDO THIS ENTIRE THING
@@ -393,12 +370,12 @@ impl MoveGen {
         board.game_state.active_color = side;
         let mut moves = Vec::with_capacity(218);
 
-        moves.append(&mut self.gen_pawn_attacks(board));
-        moves.append(&mut self.gen_knight_moves(board));
-        moves.append(&mut self.gen_rook_moves(board));
-        moves.append(&mut self.gen_bishop_moves(board));
-        moves.append(&mut self.gen_queen_moves(board));
-        moves.append(&mut self.gen_king_moves(board));
+        self.gen_pawn_attacks(board, &mut moves);
+        self.gen_knight_moves(board, &mut moves);
+        self.gen_rook_moves(board, &mut moves);
+        self.gen_bishop_moves(board, &mut moves);
+        self.gen_queen_moves(board, &mut moves);
+        self.gen_king_moves(board, &mut moves);
 
         for _move in moves {
             bitboard |= 1 << _move.to();
@@ -416,13 +393,14 @@ impl MoveGen {
 
     pub fn gen_moves(&self, board: &mut Board) -> Vec<Move> {
         let mut moves: Vec<Move> = vec![];
-        moves.append(&mut self.gen_pawn_moves(board));
-        moves.append(&mut self.gen_knight_moves(board));
-        moves.append(&mut self.gen_rook_moves(board));
-        moves.append(&mut self.gen_bishop_moves(board));
-        moves.append(&mut self.gen_queen_moves(board));
-        moves.append(&mut self.gen_king_moves(board));
-        moves.append(&mut self.gen_castle_moves(board));
+
+        self.gen_pawn_moves(board, &mut moves);
+        self.gen_knight_moves(board, &mut moves);
+        self.gen_rook_moves(board, &mut moves);
+        self.gen_bishop_moves(board, &mut moves);
+        self.gen_queen_moves(board, &mut  moves);
+        self.gen_king_moves(board, &mut moves);
+        self.gen_castle_moves(board, &mut moves);
 
         moves
     }

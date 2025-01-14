@@ -68,8 +68,6 @@ impl Search {
             best_move = current_best.unwrap();
         }
 
-        self.transposition_table.increment_age();
-
         Some(best_move)
     }
 
@@ -88,7 +86,7 @@ impl Search {
         }
 
         self.best_move = Some(moves[0].clone());
-        let score = self.negamax(
+        let score = self.negascout(
             board,
             mg,
             start_time,
@@ -105,7 +103,7 @@ impl Search {
         return self.best_move.clone();
     }
 
-    pub fn negamax(
+    pub fn negascout(
         &mut self,
         board: &mut Board,
         mg: &MoveGen,
@@ -113,21 +111,16 @@ impl Search {
         duration: Duration,
         mut alpha: i32,
         beta: i32,
-        mut depth: usize,
+        depth: usize,
         ply: usize,
     ) -> i32 {
-        let hash = board.zobrist_hash();
-
-        if depth == 0 {
-            //return self.quiesce(board, mg, -beta, -alpha, 3)
-            return self.quiesce(board, mg, alpha, beta, 10);
-        }
-
         if start_time.elapsed() > duration {
             return 0;
         }
 
-        let mut best_value = i32::MIN + 1;
+        if depth == 0 {
+            return self.quiesce(board, mg, alpha, beta, 10);
+        }
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
 
@@ -138,67 +131,109 @@ impl Search {
             return 0;
         }
 
+        // Probe transposition table for principal move, or an existing evaluation
+        let hash = board.zobrist_hash();
         if let Some(entry) = self.transposition_table.get(hash) {
-            self.put_move_first(&mut moves, &entry.best_move);
-            if entry.depth > depth {
-                if entry.move_type == MoveType::Exact {
-                    return entry.eval;
-                }
+            if entry.depth >= depth {
+                self.best_move = Some(entry.best_move.clone());
 
-                if entry.move_type == MoveType::Minimum && entry.eval >= beta {
-                    return entry.eval
-                }
-            }
-        }
-
-        let mut best_move = moves[0].clone();
-        for mv in moves {
-            board.do_move(&mv);
-            let score = -self.negamax(
-                board,
-                mg,
-                start_time,
-                duration,
-                -beta,
-                -alpha,
-                depth - 1,
-                ply + 1,
-            );
-            board.undo_move(&mv);
-            if score > best_value {
-                best_value = score;
-                best_move = mv.clone();
-                if score > alpha {
-                    alpha = score;
-                    if ply == 0 {
-                        self.best_move = Some(mv);
+                match entry.move_type {
+                    MoveType::Exact => {
+                        return entry.eval;
+                    }
+                    MoveType::Minimum => {
+                        if entry.eval >= beta {
+                            return entry.eval;
+                        }
                     }
                 }
             }
 
-            if score >= beta {
-                self.transposition_table.insert(TranspositionEntry {
-                    key: hash,
-                    best_move,
-                    eval: best_value,
-                    depth,
-                    age: self.transposition_table.age,
-                    move_type: MoveType::Minimum,
-                });
-                return best_value;
-            }
+            // Either way, set hash move to best move
+            self.put_move_first(&mut moves, &entry.best_move);
         }
 
+        let mut best_score = i32::MIN + 1;
+        let mut best_move = moves[0].clone();
+
+        let mut first_move = true;
+        for mv in moves {
+            board.do_move(&mv);
+            let mut score;
+            if first_move {
+                score = -self.negascout(
+                    board,
+                    mg,
+                    start_time,
+                    duration,
+                    -beta,
+                    -alpha,
+                    depth - 1,
+                    ply + 1,
+                );
+                first_move = false;
+            } else {
+                // Fast search, just to skip if it is worse
+                score = -self.negascout(
+                    board,
+                    mg,
+                    start_time,
+                    duration,
+                    -(alpha + 1),
+                    -alpha,
+                    depth - 1,
+                    ply + 1,
+                );
+
+                // If fail high (is better), try again with full window
+                if score > alpha && score < beta {
+                    score = -self.negascout(
+                        board,
+                        mg,
+                        start_time,
+                        duration,
+                        -beta,
+                        -alpha,
+                        depth - 1,
+                        ply + 1,
+                    );
+                }
+            }
+
+            board.undo_move(&mv);
+
+            if score > best_score {
+                best_score = score;
+                best_move = mv.clone();
+                if ply == 0 {
+                    self.best_move = Some(mv);
+                }
+
+                if score > alpha {
+                    alpha = score;
+                    if alpha >= beta {
+                        break;
+                    }
+                }
+            }
+        }
         self.transposition_table.insert(TranspositionEntry {
-            key: hash,
-            best_move,
-            eval: best_value,
             depth,
-            age: self.transposition_table.age,
-            move_type: MoveType::Exact,
+            key: hash,
+            best_move: best_move.clone(),
+            eval: best_score,
+            move_type: if best_score <= alpha {
+                MoveType::Minimum
+            } else {
+                MoveType::Exact
+            },
         });
 
-        best_value
+        if ply == 0 {
+            self.best_move = Some(best_move);
+        }
+
+        best_score
     }
 
     pub fn quiesce(
@@ -315,7 +350,7 @@ impl Search {
         let mut eval: i32 = 0;
         let mut white = board.bb_side[Sides::WHITE];
 
-        let scores = [100, 300, 300, 500, 900, 0];
+        let scores = [100, 320, 300, 500, 900, 0];
         while let Some(square) = bitscan_forward(white) {
             white &= white - 1;
             if let Some(piece) = board.get_piece_at(square) {

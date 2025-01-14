@@ -9,21 +9,19 @@ pub enum MoveType {
 }
 
 #[derive(Clone)]
-// 37 Byte entry
-// TODO: Remove age, depth as u16
+// 29 Byte entry
+// TODO: make move 32 bits, make depth a u8 (will make tt less than 25 bytes, amazing!)
 pub struct TranspositionEntry {
     pub key: ZobristHash,
     pub best_move: Move,
     pub eval: i32,
     pub depth: usize,
-    pub age: usize,
     pub move_type: MoveType,
 }
 
 pub struct TranspositionTable {
     table: Vec<TranspositionEntry>,
     max_size: usize,
-    pub age: usize,
 }
 
 impl TranspositionTable {
@@ -34,17 +32,12 @@ impl TranspositionTable {
                 best_move: Move(0),
                 eval: 0,
                 depth: 0,
-                age: 0,
                 move_type: MoveType::Exact
             };
             max_size
         ];
 
-        TranspositionTable {
-            table,
-            max_size,
-            age: 0,
-        }
+        TranspositionTable { table, max_size }
     }
 
     pub fn get(&self, hash: ZobristHash) -> Option<TranspositionEntry> {
@@ -61,10 +54,6 @@ impl TranspositionTable {
     pub fn insert(&mut self, entry: TranspositionEntry) {
         let index = self.index(entry.key);
         self.table[index] = entry;
-    }
-
-    pub fn increment_age(&mut self) {
-        self.age += 1
     }
 
     fn index(&self, key: ZobristHash) -> usize {

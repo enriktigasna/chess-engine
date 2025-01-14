@@ -80,7 +80,7 @@ impl Search {
         }
 
         self.best_move = Some(moves[0].clone());
-        self.negamax(
+        let score= self.negamax(
             board,
             mg,
             start_time,
@@ -248,7 +248,7 @@ impl Search {
         // add all white pieces
         let mut eval: i32 = 0;
 
-        let psqt_set = self.get_psqt_set();
+        let psqt_set = self.get_psqt_set(board);
         eval += self.apply_psqt(board, psqt_set);
         let side2move = match board.us() {
             Sides::WHITE => 1,
@@ -259,25 +259,51 @@ impl Search {
         eval * side2move
     }
 
-    #[inline]
-    pub const fn get_psqt_set(&self) -> [[i32; 64]; 6] {
+    pub fn get_psqt_set(&self, board: &Board) -> [[i32; 64]; 6] {
+        let weight = self.get_phase(board);
+
         [
-            PieceTables::PAWN,
-            PieceTables::BISHOP,
-            PieceTables::KNIGHT,
-            PieceTables::ROOK,
-            PieceTables::QUEEN,
-            PieceTables::EARLY_KING,
+            self.apply_weight(PieceTables::EARLY_PAWN, PieceTables::LATE_PAWN, weight),
+            self.apply_weight(PieceTables::EARLY_BISHOP, PieceTables::LATE_BISHOP, weight),
+            self.apply_weight(PieceTables::EARLY_KNIGHT, PieceTables::LATE_KNIGHT, weight),
+            self.apply_weight(PieceTables::EARLY_ROOK, PieceTables::LATE_ROOK, weight),
+            self.apply_weight(PieceTables::EARLY_QUEEN, PieceTables::LATE_QUEEN, weight),
+            self.apply_weight(PieceTables::EARLY_KING, PieceTables::LATE_KING, weight),
         ]
+    }
+
+    pub fn apply_weight(&self, midgame: [i32; 64], endgame: [i32; 64], weight: i32) -> [i32; 64] {
+        let mut out = [0; 64];
+
+        for square in 0..64 {
+            out[square] = (midgame[square]*(256 - weight) + endgame[square]*weight) / 256
+        }
+
+        out
+    }
+
+    pub fn get_phase(&self, board: &Board) -> i32 {
+        let phase_values = [0, 1, 1, 2, 4, 0];
+        let mut phase: i32 = 24;
+
+        for side in 0..2 {
+            for piece in 0..6 {
+                phase -= phase_values[piece] * (board.bb_pieces[side][piece].count_ones() as i32);
+            }
+        }
+
+        (phase * 256) / 24
     }
 
     pub fn apply_psqt(&self, board: &Board, psqt: [[i32; 64]; 6]) -> i32 {
         let mut eval: i32 = 0;
         let mut white = board.bb_side[Sides::WHITE];
+
+        let scores = [100, 300, 300, 500, 900, 0];
         while let Some(square) = bitscan_forward(white) {
             white &= white - 1;
             if let Some(piece) = board.get_piece_at(square) {
-                eval += psqt[piece][square];
+                eval += psqt[piece][square] + scores[piece];
             }
         }
 
@@ -285,7 +311,7 @@ impl Search {
         while let Some(square) = bitscan_forward(black) {
             black &= black - 1;
             if let Some(piece) = board.get_piece_at(square) {
-                eval -= psqt[piece][FLIP[square]];
+                eval -= psqt[piece][FLIP[square]] + scores[piece];
             }
         }
 

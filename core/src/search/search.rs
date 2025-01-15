@@ -119,13 +119,26 @@ impl Search {
         }
 
         if depth == 0 {
-            return self.quiesce(board, mg, alpha, beta, 10);
+            if mg.in_check(board, board.us()) && ply < 10 {
+                return -self.negascout(
+                    board,
+                    mg,
+                    start_time,
+                    duration,
+                    -beta,
+                    -alpha,
+                    depth + 1,
+                    ply + 1,
+                );
+            } else {
+                return self.quiesce(board, mg, alpha, beta, 10);
+            }
         }
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
 
         if moves.len() == 0 {
-            if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
+            if mg.in_check(board, board.us()) {
                 return i32::MIN + 1;
             }
             return 0;
@@ -155,13 +168,12 @@ impl Search {
 
 
         // Reverse futility pruning
-        if ply >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
+        if depth >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
             let static_score = self.fast_eval(board);
-            const MARGIN: i32 = 200;
+            let margin: i32 = 150 * (depth as i32);
 
-
-            if static_score >= beta + MARGIN {
-                return beta;
+            if static_score >= beta + margin {
+                return static_score;
             }
         }
 

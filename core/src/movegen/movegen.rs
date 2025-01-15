@@ -135,6 +135,7 @@ impl MoveGen {
             our_knights &= our_knights - 1;
 
             let mut target_attack_board = LeapingMagics::KNIGHT[square];
+            // Redo to OR it, and then run so that it doesn't have to keep calling is_occupied
             while let Some(target) = bitscan_forward(target_attack_board as u64) {
                 target_attack_board &= target_attack_board - 1;
 
@@ -313,20 +314,38 @@ impl MoveGen {
     pub fn gen_king_moves(&self, board: &Board, moves: &mut Vec<Move>) {
         let us = board.us();
 
-        let mut our_king = board.get_pieces(us, Pieces::KING);
-        while let Some(square) = bitscan_forward(our_king) {
-            our_king &= our_king - 1;
+        let our_king = board.get_pieces(us, Pieces::KING);
+        let square = our_king.trailing_zeros() as usize;
+        let mut target_attack_board = LeapingMagics::KING[square];
 
-            let mut target_attack_board = LeapingMagics::KING[square];
-            while let Some(target) = bitscan_forward(target_attack_board as u64) {
-                target_attack_board &= target_attack_board - 1;
+        while let Some(target) = bitscan_forward(target_attack_board as u64) {
+            target_attack_board &= target_attack_board - 1;
 
-                if board.is_occupied(us, target) {
-                    continue;
-                }
-                moves.push(Move::new(square, target, board));
+            if board.is_occupied(us, target) {
+                continue;
             }
+            moves.push(Move::new(square, target, board));
         }
+    }
+
+    pub fn get_king_bitboard(&self, board: &Board) -> usize {
+        let our_king = board.bb_pieces[board.us()][Pieces::KING].trailing_zeros();
+        let square = our_king.trailing_zeros() as usize;
+        LeapingMagics::KING[square]
+    }
+    
+    // Ts weird
+    pub fn get_knight_bitboard(&self, board: &Board) -> usize {
+        let us = board.us();
+        let mut bitboard = 0;
+
+        let mut our_knights = board.get_pieces(us, Pieces::KNIGHT);
+        while let Some(square) = bitscan_forward(our_knights) {
+            our_knights &= our_knights - 1;
+            bitboard |= LeapingMagics::KNIGHT[square];
+        }
+
+        bitboard
     }
 
     pub fn gen_castle_moves(&self, board: &mut Board, moves: &mut Vec<Move>) {
@@ -371,15 +390,15 @@ impl MoveGen {
         let mut moves = Vec::with_capacity(218);
 
         self.gen_pawn_attacks(board, &mut moves);
-        self.gen_knight_moves(board, &mut moves);
         self.gen_rook_moves(board, &mut moves);
         self.gen_bishop_moves(board, &mut moves);
         self.gen_queen_moves(board, &mut moves);
-        self.gen_king_moves(board, &mut moves);
 
         for _move in moves {
             bitboard |= 1 << _move.to();
         }
+
+        bitboard |= self.get_knight_bitboard(board) as u64;
 
         board.game_state.active_color = backup;
 

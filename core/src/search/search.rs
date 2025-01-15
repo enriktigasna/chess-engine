@@ -145,6 +145,7 @@ impl Search {
         }
 
         // Probe transposition table for principal move, or an existing evaluation
+        let estimation;
         let hash = board.zobrist_hash();
         if let Some(entry) = self.transposition_table.get(hash) {
             if entry.depth >= depth {
@@ -164,12 +165,21 @@ impl Search {
 
             // Either way, set hash move to best move
             self.put_move_first(&mut moves, &entry.best_move);
-        }
 
+            if entry.move_type == MoveType::Exact {
+                estimation = entry.eval;
+            } else {
+                estimation = self.static_eval(board);
+                // estimation = self.quiesce(board, mg, alpha, beta, 10);
+            }
+        } else {
+            estimation = self.static_eval(board);
+            // estimation = self.quiesce(board, mg, alpha, beta, 10);
+        }
 
         // Reverse futility pruning
         if depth >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
-            let static_score = self.fast_eval(board);
+            let static_score = estimation;
             let margin: i32 = 150 * (depth as i32);
 
             if static_score >= beta + margin {
@@ -197,7 +207,7 @@ impl Search {
                 );
                 first_move = false;
             } else {
-                // Fast search, just to skip if it is worse
+                // Null window search
                 score = -self.negascout(
                     board,
                     mg,
@@ -209,7 +219,29 @@ impl Search {
                     ply + 1,
                 );
 
-                // If fail high (is better), try again with full window
+                // Now do estimation windows
+                if score > alpha {
+                    const MARGINS: [i32; 3] = [10, 25, 50];
+                    for margin in MARGINS {
+                        let low = estimation - margin;
+                        let high = estimation + margin;
+
+                        if score > alpha && score < beta {
+                            score = -self.negascout(
+                                board,
+                                mg,
+                                start_time,
+                                duration,
+                                -high,
+                                -low,
+                                depth - 1,
+                                ply + 1,
+                            );
+                        }
+                    }
+                }
+
+                // Search entire window if estimation windows failed
                 if score > alpha && score < beta {
                     score = -self.negascout(
                         board,
@@ -343,7 +375,9 @@ impl Search {
 
         for side in 0..2 {
             for piece in 0..6 {
-                score += sides[side] * (board.bb_pieces[side][piece].count_ones() as i32) * scores[piece];
+                score += sides[side]
+                    * (board.bb_pieces[side][piece].count_ones() as i32)
+                    * scores[piece];
             }
         }
 

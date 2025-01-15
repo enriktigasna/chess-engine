@@ -98,7 +98,7 @@ impl Search {
         );
 
         if start_time.elapsed() < duration {
-            println!("info score cp {} depth {}", score, depth);
+            println!("info score depth {} cp {}", depth, score);
         }
         return self.best_move.clone();
     }
@@ -151,6 +151,18 @@ impl Search {
 
             // Either way, set hash move to best move
             self.put_move_first(&mut moves, &entry.best_move);
+        }
+
+
+        // Reverse futility pruning
+        if ply >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
+            let static_score = self.fast_eval(board);
+            const MARGIN: i32 = 200;
+
+
+            if static_score >= beta + MARGIN {
+                return beta;
+            }
         }
 
         let mut best_score = i32::MIN + 1;
@@ -304,6 +316,26 @@ impl Search {
         };
 
         eval * side2move
+    }
+
+    pub fn fast_eval(&self, board: &mut Board) -> i32 {
+        let mut score: i32 = 0;
+
+        let side2move = match board.us() {
+            Sides::WHITE => 1,
+            _ => -1,
+        };
+
+        let sides = [1, -1];
+        let scores = [100, 320, 300, 500, 900, 0];
+
+        for side in 0..2 {
+            for piece in 0..6 {
+                score += sides[side] * (board.bb_pieces[side][piece].count_ones() as i32) * scores[piece];
+            }
+        }
+
+        score * side2move
     }
 
     pub fn get_psqt_set(&self, board: &Board) -> [[i32; 64]; 6] {

@@ -13,7 +13,9 @@ use crate::{
 };
 
 use super::{
-    defs::PieceTables, sorting::sort_moves, ttable::{MoveType, TranspositionEntry, TranspositionTable}
+    defs::PieceTables,
+    sorting::sort_moves,
+    ttable::{MoveType, TranspositionEntry, TranspositionTable},
 };
 
 #[rustfmt::skip]
@@ -48,7 +50,7 @@ impl Search {
         max_depth: usize,
         duration: Duration,
     ) -> Option<Move> {
-        let moves = mg.gen_legal_moves_no_rep(board);
+        let mut moves = mg.gen_legal_moves_no_rep(board);
         if moves.len() == 0 {
             return None;
         }
@@ -56,6 +58,9 @@ impl Search {
         let mut best_move = moves[0].clone();
         let start_time = Instant::now();
 
+        // Incase search can't even reach 1 depth (wtf)
+        sort_moves(&mut moves, None);
+        self.best_move = Some(moves[0].clone());
         for depth in 1..max_depth {
             let current_best = self.find_best_move(board, mg, depth, start_time, duration);
 
@@ -84,7 +89,6 @@ impl Search {
             return None;
         }
 
-        self.best_move = Some(moves[0].clone());
         let score = self.negascout(
             board,
             mg,
@@ -150,22 +154,17 @@ impl Search {
 
         let mut estimation = match tt_entry {
             // If depth is better try to prune instantly
-            Some(entry) if entry.depth >= depth => {
-                match entry.move_type {
-                    MoveType::Exact => return entry.eval,
-                    MoveType::Minimum if entry.eval >= beta => return entry.eval,
-                    MoveType::Maximum if entry.eval <= alpha => return entry.eval,
-                    _ => entry.eval
-                }
+            Some(entry) if entry.depth >= depth => match entry.move_type {
+                MoveType::Exact => return entry.eval,
+                MoveType::Minimum if entry.eval >= beta => return entry.eval,
+                MoveType::Maximum if entry.eval <= alpha => return entry.eval,
+                _ => entry.eval,
             },
             // Otherwise just return tt eval, as it is more accurate than static eval
-            Some(entry) if entry.depth < depth => {
-                entry.eval
-            },
+            Some(entry) if entry.depth < depth => entry.eval,
             // Otherwise just pick static eval
-            _ => self.static_eval(board)
+            _ => self.static_eval(board),
         };
-
 
         // Reverse futility pruning
         if depth >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
@@ -308,7 +307,6 @@ impl Search {
             alpha = stand_pat;
         }
 
-
         if depth == 0 {
             return self.static_eval(board);
         }
@@ -322,9 +320,7 @@ impl Search {
         }
 
         const POINTS: [i32; 6] = [1, 3, 3, 5, 9, 0];
-        moves.retain(|mv| {
-            mv.capture().is_some() && POINTS[mv.piece()] >= POINTS[mv.piece()]
-        });
+        moves.retain(|mv| mv.capture().is_some() && POINTS[mv.piece()] >= POINTS[mv.piece()]);
         if moves.len() == 0 {
             return self.static_eval(board);
         }

@@ -3,7 +3,10 @@ use core::{
         board::Board,
         defs::{Bitboard, Pieces, Sides, Square, START_POS},
     },
-    movegen::{movegen::{bitscan_forward, MoveGen}, moves::Move},
+    movegen::{
+        movegen::{bitscan_forward, MoveGen},
+        moves::Move,
+    },
     search::{search::Search, ttable::TranspositionTable},
 };
 use std::time::{Duration, Instant};
@@ -229,13 +232,11 @@ async fn main() {
 
                             board.do_move(&_move);
 
-                            /*
                             if let Some(best_move) =
-                                search.find_best_move_iter(&mut board, &mg, 20, Duration::new(4, 0))
+                                search.find_best_move_iter(&mut board, &mg, 20, Duration::new(1, 0))
                             {
                                 board.do_move(&best_move);
                             }
-                            */
 
                             moves = mg.gen_legal_moves_no_rep(&mut board);
 

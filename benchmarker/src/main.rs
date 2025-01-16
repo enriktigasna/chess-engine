@@ -1,8 +1,15 @@
-use core::{board::{board::Board, defs::{Bitboard, START_POS}}, movegen::movegen::MoveGen};
+use core::{
+    board::{
+        board::Board,
+        defs::{Bitboard, START_POS},
+    },
+    movegen::movegen::MoveGen,
+};
 
 pub fn main() {
-    let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ")
-    .unwrap();
+    let mut board =
+        Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ")
+            .unwrap();
     let mg = MoveGen;
 
     print_perft(&mut board, &mg, 4);

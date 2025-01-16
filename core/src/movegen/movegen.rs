@@ -333,7 +333,7 @@ impl MoveGen {
         let square = our_king.trailing_zeros() as usize;
         LeapingMagics::KING[square]
     }
-    
+
     // Ts weird
     pub fn get_knight_bitboard(&self, board: &Board) -> usize {
         let us = board.us();
@@ -444,8 +444,7 @@ impl MoveGen {
             !king_in_check
         });
 
-
-        /* 
+        /*
         let points = [1, 3, 3, 5, 8, 0];
 
         pseudo_legal.sort_by(|a, b| {

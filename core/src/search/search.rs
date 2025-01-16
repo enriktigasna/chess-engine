@@ -97,7 +97,7 @@ impl Search {
         );
 
         if start_time.elapsed() < duration {
-            println!("info score depth {} cp {}", depth, score);
+            println!("info score cp {} depth {}", score, depth);
         }
         return self.best_move.clone();
     }
@@ -217,7 +217,7 @@ impl Search {
 
                 // Now do estimation windows if it failed low
                 if score > alpha {
-                    const MARGINS: [i32; 3] = [10, 25, 50];
+                    const MARGINS: [i32; 3] = [50, 150, 300];
                     for margin in MARGINS {
                         let low = estimation - margin;
                         let high = estimation + margin;
@@ -321,9 +321,9 @@ impl Search {
             return 0;
         }
 
-        const points: [i32; 6] = [1, 3, 3, 5, 9, 0];
+        const POINTS: [i32; 6] = [1, 3, 3, 5, 9, 0];
         moves.retain(|mv| {
-            mv.capture().is_some() && points[mv.piece()] >= points[mv.piece()]
+            mv.capture().is_some() && POINTS[mv.piece()] >= POINTS[mv.piece()]
         });
         if moves.len() == 0 {
             return self.static_eval(board);

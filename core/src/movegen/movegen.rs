@@ -6,7 +6,7 @@ use std::vec;
 
 use crate::board::{
     board::Board,
-    defs::{Bitboard, Pieces, Side, Sides, Square},
+    defs::{Bitboard, Pieces, Side, Sides},
 };
 
 use super::moves::{LeapingMagics, Move};
@@ -393,12 +393,11 @@ impl MoveGen {
         self.gen_rook_moves(board, &mut moves);
         self.gen_bishop_moves(board, &mut moves);
         self.gen_queen_moves(board, &mut moves);
+        self.gen_knight_moves(board, &mut moves);
 
         for _move in moves {
             bitboard |= 1 << _move.to();
         }
-
-        bitboard |= self.get_knight_bitboard(board) as u64;
 
         board.game_state.active_color = backup;
 

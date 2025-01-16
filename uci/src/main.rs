@@ -47,7 +47,7 @@ fn main() {
                 println!("readyok");
             }
             "position" => {
-                let mut fen_index = 0;
+                let mut fen_index;
                 let mut moves_index = 0;
 
                 // Default to startpos if not otherwise specified.

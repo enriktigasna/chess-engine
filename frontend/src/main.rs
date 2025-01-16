@@ -91,7 +91,7 @@ async fn main() {
     let piece_assets = PieceAssets::new().await;
 
     let mg = MoveGen;
-    let mut board = Board::from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ").expect("Invalid FEN");
+    let mut board = Board::from_fen(START_POS).expect("Invalid FEN");
     let mut search = Search {
         transposition_table: TranspositionTable::new(2000000),
         best_move: None,
@@ -206,23 +206,6 @@ async fn main() {
             );
         }
 
-        // DRAW ATTACK BB
-        let them = board.them();
-        let mut attack_bb = mg.gen_attack_bitboard(&mut board, them);
-        while let Some(square) = bitscan_forward(attack_bb) {
-            attack_bb &= attack_bb - 1;
-
-            let x = square_size * (square % 8) as f32;
-            let y = square_size * (square / 8) as f32;
-
-            draw_circle(
-                x + 0.5 * square_size,
-                y + 0.5 * square_size,
-                square_size / 5.0,
-                Color::from_rgba(255, 0, 0, (255.0 * 0.14) as u8),
-            );
-        }
-
         // TODO: Add mouse right deselect
         if is_mouse_button_down(MouseButton::Left) {
             let pos = mouse_position();
@@ -246,13 +229,11 @@ async fn main() {
 
                             board.do_move(&_move);
 
-                            /*
                             if let Some(best_move) =
                                 search.find_best_move_iter(&mut board, &mg, 20, Duration::new(4, 0))
                             {
                                 board.do_move(&best_move);
                             }
-                            */
 
                             moves = mg.gen_legal_moves_no_rep(&mut board);
 

@@ -13,8 +13,7 @@ use crate::{
 };
 
 use super::{
-    defs::PieceTables,
-    ttable::{MoveType, TranspositionEntry, TranspositionTable},
+    defs::PieceTables, sorting::sort_moves, ttable::{MoveType, TranspositionEntry, TranspositionTable}
 };
 
 #[rustfmt::skip]
@@ -135,8 +134,8 @@ impl Search {
             }
         }
 
+        // Check for draw or checkmate
         let mut moves = mg.gen_legal_moves_no_rep(board);
-
         if moves.len() == 0 {
             if mg.in_check(board, board.us()) {
                 return i32::MIN + 1;
@@ -145,50 +144,47 @@ impl Search {
         }
 
         // Probe transposition table for principal move, or an existing evaluation
-        let estimation;
         let hash = board.zobrist_hash();
-        if let Some(entry) = self.transposition_table.get(hash) {
-            if entry.depth >= depth {
-                self.best_move = Some(entry.best_move.clone());
+        let tt_entry = self.transposition_table.get(hash);
+        let hash_move: Option<Move> = tt_entry.as_ref().map(|entry| entry.best_move.clone());
 
+        let mut estimation = match tt_entry {
+            // If depth is better try to prune instantly
+            Some(entry) if entry.depth >= depth => {
                 match entry.move_type {
-                    MoveType::Exact => {
-                        return entry.eval;
-                    }
-                    MoveType::Minimum => {
-                        if entry.eval >= beta {
-                            return entry.eval;
-                        }
-                    }
+                    MoveType::Exact => return entry.eval,
+                    MoveType::Minimum if entry.eval >= beta => return entry.eval,
+                    MoveType::Maximum if entry.eval <= alpha => return entry.eval,
+                    _ => entry.eval
                 }
-            }
+            },
+            // Otherwise just return tt eval, as it is more accurate than static eval
+            Some(entry) if entry.depth < depth => {
+                entry.eval
+            },
+            // Otherwise just pick static eval
+            _ => self.static_eval(board)
+        };
 
-            // Either way, set hash move to best move
-            self.put_move_first(&mut moves, &entry.best_move);
-
-            if entry.move_type == MoveType::Exact {
-                estimation = entry.eval;
-            } else {
-                estimation = self.static_eval(board);
-                // estimation = self.quiesce(board, mg, alpha, beta, 10);
-            }
-        } else {
-            estimation = self.static_eval(board);
-            // estimation = self.quiesce(board, mg, alpha, beta, 10);
-        }
 
         // Reverse futility pruning
         if depth >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
-            let static_score = estimation;
             let margin: i32 = 150 * (depth as i32);
 
-            if static_score >= beta + margin {
-                return static_score;
+            if estimation >= beta + margin {
+                return estimation;
             }
         }
 
+        sort_moves(&mut moves, hash_move.clone());
         let mut best_score = i32::MIN + 1;
-        let mut best_move = moves[0].clone();
+        let mut best_move;
+
+        if let Some(hmv) = hash_move {
+            best_move = hmv
+        } else {
+            best_move = moves[0].clone();
+        }
 
         let mut first_move = true;
         for mv in moves {
@@ -219,7 +215,7 @@ impl Search {
                     ply + 1,
                 );
 
-                // Now do estimation windows
+                // Now do estimation windows if it failed low
                 if score > alpha {
                     const MARGINS: [i32; 3] = [10, 25, 50];
                     for margin in MARGINS {
@@ -237,6 +233,8 @@ impl Search {
                                 depth - 1,
                                 ply + 1,
                             );
+
+                            estimation = score
                         }
                     }
                 }
@@ -279,6 +277,8 @@ impl Search {
             best_move: best_move.clone(),
             eval: best_score,
             move_type: if best_score <= alpha {
+                MoveType::Maximum
+            } else if best_score >= beta {
                 MoveType::Minimum
             } else {
                 MoveType::Exact
@@ -300,25 +300,38 @@ impl Search {
         beta: i32,
         depth: usize,
     ) -> i32 {
+        let stand_pat = self.static_eval(board);
+        if stand_pat >= beta {
+            return stand_pat;
+        }
+        if stand_pat > alpha {
+            alpha = stand_pat;
+        }
+
+
         if depth == 0 {
             return self.static_eval(board);
         }
 
-        let mut best_value = i32::MIN + 1;
-
         let mut moves = mg.gen_legal_moves_no_rep(board);
-        if moves.len() == 0 {
+        if moves.is_empty() {
             if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
                 return i32::MIN + 1;
             }
             return 0;
         }
 
-        moves.retain(|mv| mv.capture().is_some());
+        const points: [i32; 6] = [1, 3, 3, 5, 9, 0];
+        moves.retain(|mv| {
+            mv.capture().is_some() && points[mv.piece()] >= points[mv.piece()]
+        });
         if moves.len() == 0 {
             return self.static_eval(board);
         }
 
+        // Check if we should grab hash move from tt
+        sort_moves(&mut moves, None);
+        let mut best_value = i32::MIN + 1;
         for mv in moves {
             board.do_move(&mv);
             let score = -self.quiesce(board, mg, -beta, -alpha, depth - 1);
@@ -337,15 +350,6 @@ impl Search {
         }
 
         best_value
-    }
-
-    pub fn put_move_first(&self, moves: &mut Vec<Move>, _move: &Move) {
-        if let Some(index) = moves.iter().position(|m| m.0 == _move.0) {
-            // Remove the move from its current position
-            let move_to_front = moves.remove(index);
-            // Insert the move at the beginning
-            moves.insert(0, move_to_front);
-        }
     }
 
     pub fn static_eval(&self, board: &mut Board) -> i32 {

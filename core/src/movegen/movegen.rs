@@ -444,6 +444,8 @@ impl MoveGen {
             !king_in_check
         });
 
+
+        /* 
         let points = [1, 3, 3, 5, 8, 0];
 
         pseudo_legal.sort_by(|a, b| {
@@ -459,6 +461,7 @@ impl MoveGen {
 
             score_b.cmp(&score_a)
         });
+        */
 
         pseudo_legal
     }

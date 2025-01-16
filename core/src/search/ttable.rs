@@ -4,6 +4,7 @@ use crate::{board::defs::ZobristHash, movegen::moves::Move};
 
 #[derive(Clone, PartialEq)]
 pub enum MoveType {
+    Maximum,
     Minimum,
     Exact,
 }

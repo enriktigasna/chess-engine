@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    board::{board::Board, defs::Sides},
+    board::{
+        board::Board,
+        defs::{Pieces, Sides},
+    },
     movegen::{
         movegen::{bitscan_forward, MoveGen},
         moves::Move,
@@ -166,12 +169,47 @@ impl Search {
             _ => self.static_eval(board),
         };
 
+        let in_check = mg.in_check(board, board.us());
         // Reverse futility pruning
-        if depth >= 3 && beta.abs() < 1000000 && !mg.in_check(board, board.us()) {
+        if depth >= 3 && beta.abs() < 1000000 && !in_check {
             let margin: i32 = 150 * (depth as i32);
 
             if estimation >= beta + margin {
                 return estimation;
+            }
+        }
+
+        // Null move pruning
+        // Check if we are in check/only have king/pawns
+        if !in_check
+            && estimation >= beta
+                && depth >= 3
+                    && !board.game_state.can_nullmove
+                        && board.bb_side[board.us()]
+                            != board.bb_pieces[board.us()][Pieces::KING]
+                                | board.bb_pieces[board.us()][Pieces::PAWN]
+        {
+            let old_state = board.game_state.clone();
+
+            board.game_state.active_color ^= 1;
+            board.game_state.enpassant_piece = None;
+            board.game_state.can_nullmove = true;
+
+            let v = -self.negascout(
+                board,
+                mg,
+                start_time,
+                duration,
+                -beta,
+                -(beta-1),
+                depth - 3,
+                ply + 1,
+            );
+
+            board.game_state = old_state;
+
+            if v >= beta {
+                return v;
             }
         }
 

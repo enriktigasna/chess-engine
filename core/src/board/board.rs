@@ -136,7 +136,7 @@ pub struct GameState {
     pub castling_permissions: u8,
     pub enpassant_piece: Option<Square>,
     // To not null move twice, when doing nmh
-    pub can_nullmove: bool
+    pub can_nullmove: bool,
 }
 
 impl GameState {
@@ -476,7 +476,7 @@ impl Board {
             active_color,
             castling_permissions,
             enpassant_piece,
-            can_nullmove: false
+            can_nullmove: true,
         };
 
         let history = History::new(); // Empty history, FEN doesn't give history information

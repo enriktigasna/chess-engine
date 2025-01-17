@@ -181,19 +181,23 @@ impl Search {
 
         // Null move pruning
         // Check if we are in check/only have king/pawns
+        let r = if depth > 6 { 3 } else { 2 };
         if !in_check
+        // Try - 50
             && estimation >= beta
-                && depth >= 3
-                    && !board.game_state.can_nullmove
-                        && board.bb_side[board.us()]
-                            != board.bb_pieces[board.us()][Pieces::KING]
-                                | board.bb_pieces[board.us()][Pieces::PAWN]
+            && depth >= 3
+            && ply > 0
+            && board.game_state.can_nullmove
+            && alpha == beta - 1
+            && board.bb_side[board.us()]
+                != board.bb_pieces[board.us()][Pieces::KING]
+                    | board.bb_pieces[board.us()][Pieces::PAWN]
         {
             let old_state = board.game_state.clone();
 
             board.game_state.active_color ^= 1;
             board.game_state.enpassant_piece = None;
-            board.game_state.can_nullmove = true;
+            board.game_state.can_nullmove = false;
 
             let v = -self.negascout(
                 board,
@@ -201,15 +205,27 @@ impl Search {
                 start_time,
                 duration,
                 -beta,
-                -(beta-1),
-                depth - 3,
+                -(beta - 1),
+                depth - r,
                 ply + 1,
             );
 
             board.game_state = old_state;
 
             if v >= beta {
-                return v;
+                let verify_score = -self.negascout(
+                    board,
+                    mg,
+                    start_time,
+                    duration,
+                    -beta,
+                    -(beta - 1),
+                    depth - r + 1,
+                    ply + 1,
+                );
+                if verify_score >= beta {
+                    return beta;
+                }
             }
         }
 
@@ -224,8 +240,12 @@ impl Search {
         }
 
         let mut first_move = true;
+        let original_can_nullmove = board.game_state.can_nullmove;
+
         for mv in moves {
             board.do_move(&mv);
+            board.game_state.can_nullmove = true;
+            
             let mut score;
             if first_move {
                 score = -self.negascout(
@@ -275,7 +295,7 @@ impl Search {
                         }
                     }
                 }
-
+                
                 // Search entire window if estimation windows failed
                 if score > alpha && score < beta {
                     score = -self.negascout(
@@ -292,6 +312,7 @@ impl Search {
             }
 
             board.undo_move(&mv);
+            board.game_state.can_nullmove = original_can_nullmove;
 
             if score > best_score {
                 best_score = score;
@@ -357,8 +378,7 @@ impl Search {
             return 0;
         }
 
-        const POINTS: [i32; 6] = [1, 3, 3, 5, 9, 0];
-        moves.retain(|mv| mv.capture().is_some() && POINTS[mv.piece()] >= POINTS[mv.piece()]);
+        moves.retain(|mv| mv.capture().is_some());
         if moves.len() == 0 {
             return self.static_eval(board);
         }

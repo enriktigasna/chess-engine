@@ -181,7 +181,7 @@ impl Search {
 
         // Null move pruning
         // Check if we are in check/only have king/pawns
-        let r = if depth > 6 { 3 } else { 2 };
+        let r = 3;
         if !in_check
         // Try - 50
             && estimation >= beta
@@ -252,7 +252,9 @@ impl Search {
             
             // Magic LMR Formula
             let reduction = if can_reduce {
-                ((depth.min(32) as f64).ln() * (move_count.min(32) as f64).ln() / 2.0) as usize
+                pub const CONSTANT: f64 = 2.78;
+                pub const FACTOR: f64 = 0.40;
+                (CONSTANT + (depth.min(32) as f64).ln() * (move_count.min(32) as f64).ln() * FACTOR) as usize
             } else {
                 0
             };
@@ -398,42 +400,20 @@ impl Search {
         // add all white pieces
         let mut eval: i32 = 0;
 
-        let psqt_set = self.get_psqt_set(board);
+        let phase = self.get_phase(board);
+        let psqt_set = self.get_psqt_set(phase);
+
         eval += self.apply_psqt(board, psqt_set);
+
         let side2move = match board.us() {
             Sides::WHITE => 1,
             _ => -1,
         };
-
         eval * side2move
     }
 
-    pub fn fast_eval(&self, board: &mut Board) -> i32 {
-        let mut score: i32 = 0;
-
-        let side2move = match board.us() {
-            Sides::WHITE => 1,
-            _ => -1,
-        };
-
-        let sides = [1, -1];
-        let scores = [100, 320, 300, 500, 900, 0];
-
-        for side in 0..2 {
-            for piece in 0..6 {
-                score += sides[side]
-                    * (board.bb_pieces[side][piece].count_ones() as i32)
-                    * scores[piece];
-            }
-        }
-
-        score * side2move
-    }
-
-    pub fn get_psqt_set(&self, board: &Board) -> [[i32; 64]; 6] {
-        let weight = self.get_phase(board);
-
-        self.psqt_cache[weight as usize]
+    pub fn get_psqt_set(&self, phase: i32) -> [[i32; 64]; 6] {
+        self.psqt_cache[phase as usize]
     }
 
     pub fn gen_psqt_set(&self, weight: i32) -> [[i32; 64]; 6] {

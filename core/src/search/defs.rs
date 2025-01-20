@@ -1,5 +1,7 @@
 pub struct PieceTables;
 
+pub const INF: i32 = i32::MAX - 1;
+
 #[rustfmt::skip]
 impl PieceTables {
     pub const EARLY_KING: [i32; 64] = [

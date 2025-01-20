@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    defs::PieceTables,
+    defs::{PieceTables, INF},
     sorting::sort_moves,
     ttable::{MoveType, TranspositionEntry, TranspositionTable},
 };
@@ -97,8 +97,8 @@ impl Search {
             mg,
             start_time,
             duration,
-            i32::MIN + 1,
-            i32::MAX - 1,
+            -INF,
+            INF,
             depth,
             0,
         );
@@ -145,7 +145,7 @@ impl Search {
         let mut moves = mg.gen_legal_moves_no_rep(board);
         if moves.len() == 0 {
             if mg.in_check(board, board.us()) {
-                return i32::MIN + 1;
+                return -INF;
             }
             return 0;
         }
@@ -230,24 +230,35 @@ impl Search {
         }
 
         sort_moves(&mut moves, hash_move.clone());
-        let mut best_score = i32::MIN + 1;
-        let mut best_move;
+        let mut best_score = -INF;
+        let mut best_move = moves[0].clone();
 
-        if let Some(hmv) = hash_move {
-            best_move = hmv
-        } else {
-            best_move = moves[0].clone();
-        }
-
-        let mut first_move = true;
         let original_can_nullmove = board.game_state.can_nullmove;
 
+        let mut move_count = 0;
         for mv in moves {
             board.do_move(&mv);
             board.game_state.can_nullmove = true;
+
+            // Late move reduction
+            let can_reduce = 
+                depth >= 3 &&
+                move_count >= 3 &&
+                !in_check &&
+                mv.capture().is_none() &&
+                !mv.is_promotion() &&
+                alpha > -INF &&
+                beta < INF;
+            
+            // Magic LMR Formula
+            let reduction = if can_reduce {
+                ((depth.min(32) as f64).ln() * (move_count.min(32) as f64).ln() / 2.0) as usize
+            } else {
+                0
+            };
             
             let mut score;
-            if first_move {
+            if move_count == 0 {
                 score = -self.negascout(
                     board,
                     mg,
@@ -258,7 +269,6 @@ impl Search {
                     depth - 1,
                     ply + 1,
                 );
-                first_move = false;
             } else {
                 // Null window search
                 score = -self.negascout(
@@ -268,36 +278,12 @@ impl Search {
                     duration,
                     -(alpha + 1),
                     -alpha,
-                    depth - 1,
+                    depth - 1 - reduction,
                     ply + 1,
                 );
 
-                // Now do estimation windows if it failed low
+                // Search entire window if null window failed
                 if score > alpha {
-                    const MARGINS: [i32; 3] = [50, 150, 300];
-                    for margin in MARGINS {
-                        let low = estimation - margin;
-                        let high = estimation + margin;
-
-                        if score > alpha && score < beta {
-                            score = -self.negascout(
-                                board,
-                                mg,
-                                start_time,
-                                duration,
-                                -high,
-                                -low,
-                                depth - 1,
-                                ply + 1,
-                            );
-
-                            estimation = score
-                        }
-                    }
-                }
-                
-                // Search entire window if estimation windows failed
-                if score > alpha && score < beta {
                     score = -self.negascout(
                         board,
                         mg,
@@ -328,6 +314,8 @@ impl Search {
                     }
                 }
             }
+
+            move_count += 1;
         }
         self.transposition_table.insert(TranspositionEntry {
             depth,
@@ -373,7 +361,7 @@ impl Search {
         let mut moves = mg.gen_legal_moves_no_rep(board);
         if moves.is_empty() {
             if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
-                return i32::MIN + 1;
+                return -INF;
             }
             return 0;
         }
@@ -385,7 +373,7 @@ impl Search {
 
         // Check if we should grab hash move from tt
         sort_moves(&mut moves, None);
-        let mut best_value = i32::MIN + 1;
+        let mut best_value = -INF;
         for mv in moves {
             board.do_move(&mv);
             let score = -self.quiesce(board, mg, -beta, -alpha, depth - 1);

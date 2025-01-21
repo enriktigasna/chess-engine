@@ -1,5 +1,3 @@
-use std::vec;
-
 // Low hanging fruit:
 // replace bitscan_forward with squares_in iterator
 // PRE_ALLOCATE STACK SLICES INSTEAD OF VEC
@@ -9,7 +7,7 @@ use crate::board::{
     defs::{Bitboard, Pieces, Side, Sides},
 };
 
-use super::{movelist::{MoveList, MAX_LEGAL_MOVES}, moves::{LeapingMagics, Move}};
+use super::{movelist::MoveList, moves::{LeapingMagics, Move}};
 
 pub fn bitscan_forward(bb: u64) -> Option<usize> {
     if bb == 0 {

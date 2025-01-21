@@ -117,7 +117,7 @@ impl Search {
         duration: Duration,
         mut alpha: i32,
         beta: i32,
-        depth: usize,
+        mut depth: usize,
         ply: usize,
     ) -> i32 {
         if start_time.elapsed() > duration {
@@ -126,16 +126,7 @@ impl Search {
 
         if depth == 0 {
             if mg.in_check(board, board.us()) && ply < 10 {
-                return -self.negascout(
-                    board,
-                    mg,
-                    start_time,
-                    duration,
-                    -beta,
-                    -alpha,
-                    depth + 1,
-                    ply + 1,
-                );
+                depth += 1
             } else {
                 return self.quiesce(board, mg, alpha, beta, 10);
             }
@@ -145,7 +136,7 @@ impl Search {
         let mut moves = mg.gen_legal_moves_no_rep(board);
         if moves.index == 0 {
             if mg.in_check(board, board.us()) {
-                return -INF;
+                return -INF + (ply as i32);
             }
             return 0;
         }
@@ -155,7 +146,7 @@ impl Search {
         let tt_entry = self.transposition_table.get(hash);
         let hash_move: Option<Move> = tt_entry.as_ref().map(|entry| entry.best_move.clone());
 
-        let mut estimation = match tt_entry {
+        let estimation = match tt_entry {
             // If depth is better try to prune instantly
             Some(entry) if entry.depth >= depth => match entry.move_type {
                 MoveType::Exact => return entry.eval,
@@ -163,8 +154,6 @@ impl Search {
                 MoveType::Maximum if entry.eval <= alpha => return entry.eval,
                 _ => entry.eval,
             },
-            // Otherwise just return tt eval, as it is more accurate than static eval
-            Some(entry) if entry.depth < depth => entry.eval,
             // Otherwise just pick static eval
             _ => self.static_eval(board),
         };
@@ -224,7 +213,7 @@ impl Search {
                     ply + 1,
                 );
                 if verify_score >= beta {
-                    return beta;
+                    return verify_score;
                 }
             }
         }
@@ -251,13 +240,16 @@ impl Search {
                 beta < INF;
             
             // Magic LMR Formula
-            let reduction = if can_reduce {
+            let mut reduction = if can_reduce {
                 pub const CONSTANT: f64 = 2.78;
                 pub const FACTOR: f64 = 0.40;
                 (CONSTANT + (depth.min(32) as f64).ln() * (move_count.min(32) as f64).ln() * FACTOR) as usize
             } else {
                 0
             };
+
+            // Make it not be larger than depth - 1 (otherwise it tries to subtract with overflow)
+            reduction = reduction.min(depth - 1);
             
             let mut score;
             if move_count == 0 {
@@ -360,7 +352,7 @@ impl Search {
             return self.static_eval(board);
         }
 
-        let mut moves = mg.gen_legal_moves_no_rep(board);
+        let moves = mg.gen_legal_moves_no_rep(board);
         if moves.index == 0 {
             if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
                 return -INF;

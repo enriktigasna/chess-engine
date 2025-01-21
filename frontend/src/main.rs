@@ -4,8 +4,7 @@ use core::{
         defs::{Bitboard, Pieces, Sides, Square, START_POS},
     },
     movegen::{
-        movegen::{bitscan_forward, MoveGen},
-        moves::Move,
+        movegen::{bitscan_forward, MoveGen}, movelist::MoveList, moves::Move
     },
     search::{search::Search, ttable::TranspositionTable},
 };
@@ -170,14 +169,17 @@ async fn main() {
         }
 
         if let Some(square_index) = active_square {
-            let moves: Vec<Move> = moves
-                .clone()
-                .into_iter()
-                .filter(|x| x.from() == square_index)
-                .collect();
+            // Create moves that are only on the from square
+            let mut moves_from = MoveList::new();
+
+            for mv in moves.iter() {
+                if mv.from() == square_index {
+                    moves_from.push(*mv);
+                }
+            }
 
             move_hints.clear();
-            for _move in moves.into_iter() {
+            for _move in moves_from.iter() {
                 if _move.from() == square_index {
                     move_hints.push(_move.to());
 
@@ -221,7 +223,7 @@ async fn main() {
                 let target = (y as usize) * 8 + (x as usize);
 
                 if move_hints.contains(&target) {
-                    for _move in moves.clone() {
+                    for _move in moves.clone().iter() {
                         if _move.from() == active_square.expect("Corrupted board state")
                             && _move.to() == target
                         {
@@ -239,7 +241,6 @@ async fn main() {
                             }
 
                             moves = mg.gen_legal_moves_no_rep(&mut board);
-
                             break;
                         }
                     }

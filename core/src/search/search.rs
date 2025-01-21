@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     defs::{PieceTables, INF},
-    sorting::sort_moves,
+    sorting::{retain_captures, sort_moves},
     ttable::{MoveType, TranspositionEntry, TranspositionTable},
 };
 
@@ -54,16 +54,16 @@ impl Search {
         duration: Duration,
     ) -> Option<Move> {
         let mut moves = mg.gen_legal_moves_no_rep(board);
-        if moves.len() == 0 {
+        if moves.index == 0 {
             return None;
         }
 
-        let mut best_move = moves[0].clone();
+        let mut best_move = moves.moves[0].clone();
         let start_time = Instant::now();
 
         // Incase search can't even reach 1 depth (wtf)
         sort_moves(&mut moves, None);
-        self.best_move = Some(moves[0].clone());
+        self.best_move = Some(moves.moves[0].clone());
         for depth in 1..max_depth {
             let current_best = self.find_best_move(board, mg, depth, start_time, duration);
 
@@ -88,7 +88,7 @@ impl Search {
     ) -> Option<Move> {
         let moves = mg.gen_legal_moves_no_rep(board);
 
-        if moves.len() == 0 {
+        if moves.index == 0 {
             return None;
         }
 
@@ -143,7 +143,7 @@ impl Search {
 
         // Check for draw or checkmate
         let mut moves = mg.gen_legal_moves_no_rep(board);
-        if moves.len() == 0 {
+        if moves.index == 0 {
             if mg.in_check(board, board.us()) {
                 return -INF;
             }
@@ -231,12 +231,12 @@ impl Search {
 
         sort_moves(&mut moves, hash_move.clone());
         let mut best_score = -INF;
-        let mut best_move = moves[0].clone();
+        let mut best_move = moves.moves[0].clone();
 
         let original_can_nullmove = board.game_state.can_nullmove;
 
         let mut move_count = 0;
-        for mv in moves {
+        for mv in moves.iter() {
             board.do_move(&mv);
             board.game_state.can_nullmove = true;
 
@@ -306,7 +306,7 @@ impl Search {
                 best_score = score;
                 best_move = mv.clone();
                 if ply == 0 {
-                    self.best_move = Some(mv);
+                    self.best_move = Some(*mv);
                 }
 
                 if score > alpha {
@@ -361,22 +361,24 @@ impl Search {
         }
 
         let mut moves = mg.gen_legal_moves_no_rep(board);
-        if moves.is_empty() {
+        if moves.index == 0 {
             if mg.in_check(board, Sides::WHITE) || mg.in_check(board, Sides::BLACK) {
                 return -INF;
             }
             return 0;
         }
 
-        moves.retain(|mv| mv.capture().is_some());
-        if moves.len() == 0 {
+        let mut captures = retain_captures(moves);
+
+        if captures.index == 0 {
             return self.static_eval(board);
         }
 
-        // Check if we should grab hash move from tt
-        sort_moves(&mut moves, None);
+        // TODO: Check if we should grab hash move from tt
+        sort_moves(&mut captures, None);
+
         let mut best_value = -INF;
-        for mv in moves {
+        for mv in captures.iter() {
             board.do_move(&mv);
             let score = -self.quiesce(board, mg, -beta, -alpha, depth - 1);
             board.undo_move(&mv);

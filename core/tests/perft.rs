@@ -56,39 +56,18 @@ fn test_perft_nodes_v2(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
     let mut count: usize = 0;
 
     if depth == 1 {
-        return mg.gen_legal_moves(board).len();
+        return mg.gen_legal_moves(board).index;
     }
 
     let moves = mg.gen_moves(board);
 
-    for _move in moves {
+    for _move in moves.iter() {
         board.do_move(&_move);
         if mg.in_check(board, board.them()) {
             board.undo_move(&_move);
             continue;
         }
         count += test_perft_nodes_v2(depth - 1, mg, board);
-        board.undo_move(&_move);
-    }
-
-    count
-}
-
-fn test_perft_captures(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
-    let mut count: usize = 0;
-    let moves = mg.gen_legal_moves(board);
-
-    if depth == 1 {
-        return moves
-            .into_iter()
-            .filter(|_move| _move.capture().is_some())
-            .collect::<Vec<_>>()
-            .len();
-    }
-
-    for _move in moves {
-        board.do_move(&_move);
-        count += test_perft_captures(depth - 1, mg, board);
         board.undo_move(&_move);
     }
 

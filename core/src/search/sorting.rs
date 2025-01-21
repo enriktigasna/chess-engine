@@ -1,28 +1,28 @@
-use crate::movegen::moves::Move;
+use crate::movegen::{movelist::MoveList, moves::Move};
 
-pub fn sort_moves(moves: &mut Vec<Move>, hash_move: Option<Move>) {
-    let points = [1, 3, 3, 5, 8, 0];
+use super::defs::INF;
 
-    moves.sort_by(|a, b| {
-        let score_a = a
-            .capture()
-            .map(|cap| points[cap] * 10 - points[a.piece()])
-            .unwrap_or(0);
+pub fn sort_moves(moves: &mut MoveList, hash_move: Option<Move>) {
+    let points = [1, 3, 3, 5, 9, 0];
 
-        let score_b = b
-            .capture()
-            .map(|cap| points[cap] * 10 - points[b.piece()])
-            .unwrap_or(0);
-
-        score_b.cmp(&score_a)
-    });
-
-    if let Some(mv) = hash_move {
-        if let Some(index) = moves.iter().position(|m| m.0 == mv.0) {
-            // Remove the move from its current position
-            let move_to_front = moves.remove(index);
-            // Insert the move at the beginning
-            moves.insert(0, move_to_front);
+    moves.moves[..moves.index].sort_unstable_by_key(|mv| {
+        if Some(*mv) == hash_move {
+            return -INF;
         }
+
+        if mv.capture().is_none() { return 0 };
+        
+        -points[mv.capture().unwrap()]*10 - points[mv.piece()]
+    });
+}
+
+pub fn retain_captures(moves: MoveList) -> MoveList {
+    let mut captures = MoveList::new();
+    for mv in moves.iter() {
+        if mv.capture().is_some() {
+            captures.push(*mv);
+        };
     }
+
+    captures
 }

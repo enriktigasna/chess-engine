@@ -4,7 +4,7 @@ use crate::board::{
 };
 use std::fmt;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Move(pub usize);
 
 // 6 bits From

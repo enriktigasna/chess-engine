@@ -17,7 +17,7 @@ pub fn main() {
 
 fn print_perft(board: &mut Board, mg: &MoveGen, depth: usize) {
     let moves = mg.gen_legal_moves(board);
-    for _move in moves {
+    for _move in moves.iter() {
         board.do_move(&_move);
         println!(
             "{}{} {}",
@@ -35,12 +35,12 @@ fn test_perft_nodes(depth: usize, mg: &MoveGen, board: &mut Board) -> usize {
     let mut count: usize = 0;
 
     if depth == 1 {
-        return mg.gen_legal_moves(board).len();
+        return mg.gen_legal_moves(board).index;
     }
 
     let moves = mg.gen_moves(board);
 
-    for _move in moves {
+    for _move in moves.iter() {
         board.do_move(&_move);
         if mg.in_check(board, board.them()) {
             board.undo_move(&_move);

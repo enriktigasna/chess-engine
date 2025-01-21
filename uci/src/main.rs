@@ -81,7 +81,7 @@ fn main() {
                         let from_sq = algebraic_to_square(&mv_str[0..2]);
                         let to_sq = algebraic_to_square(&mv_str[2..4]);
 
-                        for mv in moves {
+                        for mv in moves.iter() {
                             if mv.is_promotion() {
                                 // If parts[move_index] is 4, it will promote to queen
                                 if mv_str.len() == 4 {

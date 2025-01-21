@@ -9,7 +9,7 @@ use crate::board::{
     defs::{Bitboard, Pieces, Side, Sides},
 };
 
-use super::moves::{LeapingMagics, Move};
+use super::{movelist::{MoveList, MAX_LEGAL_MOVES}, moves::{LeapingMagics, Move}};
 
 pub fn bitscan_forward(bb: u64) -> Option<usize> {
     if bb == 0 {
@@ -21,7 +21,7 @@ pub fn bitscan_forward(bb: u64) -> Option<usize> {
 
 pub struct MoveGen;
 impl MoveGen {
-    pub fn gen_pawn_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_pawn_moves(&self, board: &Board, moves: &mut MoveList) {
         // Step 1. Make function to return a forward bitboard for a given pawn
         let us = board.us();
         let them = board.them();
@@ -91,7 +91,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_pawn_attacks(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_pawn_attacks(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
 
         let our_pawns = board.get_pieces(us, Pieces::PAWN);
@@ -127,7 +127,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_knight_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_knight_moves(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
 
         let mut our_knights = board.get_pieces(us, Pieces::KNIGHT);
@@ -147,7 +147,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_rook_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_rook_moves(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
         let them = board.them();
 
@@ -197,7 +197,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_bishop_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_bishop_moves(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 4] = &[9, -9, 7, -7];
@@ -249,7 +249,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_queen_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_queen_moves(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
         let them = board.them();
         let directions: &[isize; 8] = &[9, -9, 7, -7, 1, -1, 8, -8];
@@ -311,7 +311,7 @@ impl MoveGen {
         }
     }
 
-    pub fn gen_king_moves(&self, board: &Board, moves: &mut Vec<Move>) {
+    pub fn gen_king_moves(&self, board: &Board, moves: &mut MoveList) {
         let us = board.us();
 
         let our_king = board.get_pieces(us, Pieces::KING);
@@ -348,7 +348,7 @@ impl MoveGen {
         bitboard
     }
 
-    pub fn gen_castle_moves(&self, board: &mut Board, moves: &mut Vec<Move>) {
+    pub fn gen_castle_moves(&self, board: &mut Board, moves: &mut MoveList) {
         let us = board.us();
         let them = board.them();
 
@@ -387,7 +387,7 @@ impl MoveGen {
 
         let backup = board.game_state.active_color;
         board.game_state.active_color = side;
-        let mut moves = Vec::with_capacity(218);
+        let mut moves = MoveList::new();
 
         self.gen_pawn_attacks(board, &mut moves);
         self.gen_rook_moves(board, &mut moves);
@@ -396,7 +396,7 @@ impl MoveGen {
         self.gen_knight_moves(board, &mut moves);
         self.gen_king_moves(board, &mut moves);
 
-        for _move in moves {
+        for _move in moves.iter() {
             bitboard |= 1 << _move.to();
         }
 
@@ -410,8 +410,8 @@ impl MoveGen {
         king & self.gen_attack_bitboard(board, side ^ 1) != 0
     }
 
-    pub fn gen_moves(&self, board: &mut Board) -> Vec<Move> {
-        let mut moves: Vec<Move> = vec![];
+    pub fn gen_moves(&self, board: &mut Board) -> MoveList {
+        let mut moves= MoveList::new();
 
         self.gen_pawn_moves(board, &mut moves);
         self.gen_knight_moves(board, &mut moves);
@@ -424,44 +424,31 @@ impl MoveGen {
         moves
     }
 
-    pub fn gen_legal_moves_no_rep(&self, board: &mut Board) -> Vec<Move> {
+    pub fn gen_legal_moves_no_rep(&self, board: &mut Board) -> MoveList {
         let count = board.history.count_hash(board.zobrist_hash());
         if count >= 3 {
-            return vec![];
+            return MoveList::new();
         }
 
         self.gen_legal_moves(board)
     }
 
-    pub fn gen_legal_moves(&self, board: &mut Board) -> Vec<Move> {
-        let mut pseudo_legal = self.gen_moves(board);
+    pub fn gen_legal_moves(&self, board: &mut Board) -> MoveList {
+        let pseudo_legal = self.gen_moves(board);
         let us = board.us();
 
-        pseudo_legal.retain(|_move| {
-            board.do_move(_move);
+        //
+        let mut safe_moves = MoveList::new();
+        for &mv in pseudo_legal.iter() {
+            board.do_move(&mv);
             let king_in_check = self.in_check(board, us);
-            board.undo_move(_move);
-            !king_in_check
-        });
+            board.undo_move(&mv);
+        
+            if !king_in_check {
+                safe_moves.push(mv);
+            }
+        }
 
-        /*
-        let points = [1, 3, 3, 5, 8, 0];
-
-        pseudo_legal.sort_by(|a, b| {
-            let score_a = a
-                .capture()
-                .map(|cap| points[cap] * 10 - points[a.piece()])
-                .unwrap_or(0);
-
-            let score_b = b
-                .capture()
-                .map(|cap| points[cap] * 10 - points[b.piece()])
-                .unwrap_or(0);
-
-            score_b.cmp(&score_a)
-        });
-        */
-
-        pseudo_legal
+        safe_moves
     }
 }

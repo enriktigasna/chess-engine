@@ -341,15 +341,11 @@ impl Search {
         depth: usize,
     ) -> i32 {
         let stand_pat = self.static_eval(board);
-        if stand_pat >= beta {
+        if stand_pat >= beta || depth == 0 {
             return stand_pat;
         }
         if stand_pat > alpha {
             alpha = stand_pat;
-        }
-
-        if depth == 0 {
-            return self.static_eval(board);
         }
 
         let moves = mg.gen_legal_moves_no_rep(board);
@@ -363,7 +359,7 @@ impl Search {
         let mut captures = retain_captures(moves);
 
         if captures.index == 0 {
-            return self.static_eval(board);
+            return stand_pat;
         }
 
         // TODO: Check if we should grab hash move from tt
@@ -398,12 +394,35 @@ impl Search {
         let psqt_set = self.get_psqt_set(phase);
 
         eval += self.apply_psqt(board, psqt_set);
+        eval += self.double_pawn_penalty(board);
+        // Passed pawn bonus
 
         let side2move = match board.us() {
             Sides::WHITE => 1,
             _ => -1,
         };
         eval * side2move
+    }
+
+    // Remove 40 points for each file with more than one pawn
+    pub fn double_pawn_penalty(&self, board: &Board) -> i32 {
+        let mut eval = 0;
+        const FILE_MASK: u64 = 0x101010101010101;
+        let white_pawns = board.bb_pieces[Sides::WHITE][Pieces::PAWN];
+        let black_pawns = board.bb_pieces[Sides::BLACK][Pieces::PAWN];
+
+        for file in 0..8 {
+            let filemask = FILE_MASK >> file;
+            if (white_pawns & filemask).count_ones() > 1 {
+                eval -= 40;
+            }
+            
+            if (black_pawns & filemask).count_ones() > 1 {
+                eval += 40;
+            }
+        }
+
+        eval
     }
 
     pub fn get_psqt_set(&self, phase: i32) -> [[i32; 64]; 6] {

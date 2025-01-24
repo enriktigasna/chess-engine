@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use crate::movegen::{movegen::bitscan_forward, moves::Move};
 
 use super::defs::{
-    Bitboard, InvalidFenError, NrOf, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES,
+    Bitboard, InvalidFenError, Piece, Pieces, Side, Sides, Square, ZobristHash, BB_SQUARES,
     EMPTY,
 };
 
@@ -38,7 +38,7 @@ pub fn algebraic_to_square(alg: &str) -> usize {
 }
 
 pub struct ZobristRandoms {
-    rnd_pieces: [[[u64; 64]; NrOf::PIECE_TYPES]; 2],
+    rnd_pieces: [[[u64; 64]; 6]; 2],
     rnd_castling: [u64; 4],
     rnd_side: [u64; 2],
     rnd_en_passant: [u64; 65],
@@ -49,7 +49,7 @@ impl ZobristRandoms {
         *rand = rand.wrapping_mul(6364136223846793005).wrapping_add(1);
     }
     fn new() -> ZobristRandoms {
-        let mut rnd_pieces = [[[0u64; 64]; NrOf::PIECE_TYPES]; 2];
+        let mut rnd_pieces = [[[0u64; 64]; 6]; 2];
         let mut rnd_castling = [0u64; 4];
         let mut rnd_side = [0u64; 2];
         let mut rnd_en_passant = [0u64; 65];
@@ -58,7 +58,7 @@ impl ZobristRandoms {
 
         // Random pieces
         for side in 0..2 {
-            for piece in 0..NrOf::PIECE_TYPES {
+            for piece in 0..6 {
                 for square in 0..64 {
                     Self::next_random(&mut rand);
                     rnd_pieces[side][piece][square] = rand;
@@ -167,11 +167,11 @@ impl GameState {
 }
 
 pub struct Board {
-    pub bb_pieces: [[Bitboard; NrOf::PIECE_TYPES]; 2],
+    pub bb_pieces: [[Bitboard; 6]; 2],
     pub bb_side: [Bitboard; 3],
     pub game_state: GameState,
     pub history: History,
-    pub piece_list: [Option<Piece>; NrOf::SQUARES],
+    pub piece_list: [Option<Piece>; 64],
     zobrist_randoms: ZobristRandoms,
 }
 
@@ -257,7 +257,7 @@ impl Board {
     pub fn zobrist_hash(&self) -> ZobristHash {
         let mut zobrist_hash: ZobristHash = 0;
         for side in 0..2 {
-            for piece in 0..NrOf::PIECE_TYPES {
+            for piece in 0..6 {
                 let mut current = self.bb_pieces[side][piece];
                 while let Some(square) = bitscan_forward(current) {
                     current &= current - 1;
@@ -345,7 +345,7 @@ impl Board {
 
     pub fn remove_piece(&mut self, square: Square) {
         for side in 0..2 {
-            for piece in 0..NrOf::PIECE_TYPES {
+            for piece in 0..6 {
                 self.bb_pieces[side][piece] = self.bb_pieces[side][piece] & !(1 << square);
             }
         }
@@ -388,7 +388,7 @@ impl Board {
     }
 
     pub fn from_fen(fen_string: &str) -> Result<Board, InvalidFenError> {
-        let mut bb_pieces = [[EMPTY; NrOf::PIECE_TYPES]; 2];
+        let mut bb_pieces = [[EMPTY; 6]; 2];
         let parts: Vec<&str> = fen_string.split(' ').collect();
 
         if parts.len() < 4 {
@@ -406,7 +406,7 @@ impl Board {
             _ => return Err(InvalidFenError::InvalidActiveColor),
         };
 
-        for rank in 0..NrOf::RANKS {
+        for rank in 0..8 {
             let mut file: usize = 0;
             // For each rank
             for c in ranks[rank].chars() {
